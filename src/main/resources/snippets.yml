@@ -1,0 +1,166 @@
+# Quest Codex Extension - Default snippets
+codex:
+  menu:
+    main:
+      title: "Quest Categories"
+      rows: 6
+      categories-per-row: 9
+      category:
+        material: "BOOK"
+        name-color: "<yellow>"
+        name-bold: false
+        custom-model-data: 0
+        lore-quest-count:
+          - "<gray><completed>/<total> quests</gray>"
+        lore:
+          - "<gray>Click to view quests</gray>"
+      fill:
+        material: "GRAY_STAINED_GLASS_PANE"
+        name: ""
+        custom-model-data: 0
+      button:
+        previous:
+          name: "Previous Page"
+          material: "ARROW"
+          lore:
+            - "<gray>Go to previous page</gray>"
+          column: 0
+          custom-model-data: 0
+        next:
+          name: "Next Page"
+          material: "ARROW"
+          lore:
+            - "<gray>Go to next page</gray>"
+          column: 8
+          custom-model-data: 0
+        info:
+          name: "Info"
+          material: "PAPER"
+          lore:
+            - "<gray>Completed: %typewriter_total_completed%/%typewriter_total_quests%</gray>"
+          column: 4
+          custom-model-data: 0
+    sub:
+      title: "<category>"
+      rows: 6
+      categories-per-row: 9
+      fill:
+        material: "GRAY_STAINED_GLASS_PANE"
+        name: ""
+        custom-model-data: 0
+      button:
+        previous:
+          name: "Previous Page"
+          material: "ARROW"
+          lore:
+            - "<gray>Go to previous page</gray>"
+          column: 0
+          custom-model-data: 0
+        next:
+          name: "Next Page"
+          material: "ARROW"
+          lore:
+            - "<gray>Go to next page</gray>"
+          column: 8
+          custom-model-data: 0
+        info:
+          name: "Info"
+          material: "PAPER"
+          lore:
+            - "<gray>Completed: %typewriter_total_completed%/%typewriter_total_quests%</gray>"
+          column: 4
+          custom-model-data: 0
+        back:
+          name: "Back"
+          material: "BARRIER"
+          lore:
+            - "<gray>Return to parent</gray>"
+          column: 7
+          custom-model-data: 0
+    quests-per-row: 9
+    button:
+      previous:
+        name: "Previous Page"
+        material: "ARROW"
+        lore:
+          - "<gray>Go to previous page</gray>"
+        column: 0
+        custom-model-data: 0
+      next:
+        name: "Next Page"
+        material: "ARROW"
+        lore:
+          - "<gray>Go to next page</gray>"
+        column: 8
+        custom-model-data: 0
+      back:
+        name: "Back"
+        material: "BARRIER"
+        lore:
+          - "<gray>Return to categories</gray>"
+        column: 7
+        custom-model-data: 0
+      quest:
+        completed:
+          material: "ENCHANTED_BOOK"
+          custom-model-data: 0
+          lore:
+            - "<green>✓ Completed</green>"
+        in-progress:
+          material: "WRITABLE_BOOK"
+          custom-model-data: 0
+          lore:
+            - "<yellow>⚡ In Progress</yellow>"
+        not-started:
+          material: "BOOK"
+          custom-model-data: 0
+          lore:
+            - "<gray>○ Not Started</gray>"
+        track:
+          lore:
+            - "<gray>Click to track</gray>"
+          message: "<green>You are now tracking <quest>.</green>"
+        untrack:
+          lore:
+            - "<gray>Click to untrack</gray>"
+          message: "<gray>You are no longer tracking any quests.</gray>"
+        sort:
+          column: 4
+          title:
+            name: "Sort"
+            material: "COMPARATOR"
+            custom-model-data: 0
+          selected-prefix: "\u2192 "
+          selected-format: "<green>{prefix}{name}</green>"
+          unselected-format: "<white>{name}</white>"
+          all:
+            name: "All Quests"
+          completed:
+            name: "Completed"
+          in-progress:
+            name: "In Progress"
+          not-started:
+            name: "Not Started"
+    fill:
+      material: "GRAY_STAINED_GLASS_PANE"
+      name: ""
+      custom-model-data: 0
+    empty-quest:
+      material: "GRAY_STAINED_GLASS_PANE"
+      name: ""
+      custom-model-data: 0
+      lore:
+        - "<gray>No quests available</gray>"
+  sound:
+    menu:
+      open: ""
+      switch: ""
+    button:
+      previous: ""
+      next: ""
+      back: ""
+      sort: ""
+      category: ""
+      quest:
+        track: ""
+        untrack: ""

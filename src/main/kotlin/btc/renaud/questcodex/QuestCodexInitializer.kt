@@ -34,6 +34,8 @@ object QuestCodexInitializer : Initializable {
                 it.blockedMessage.replace("\r", "").split("\n"),
                 it.activeMessage.replace("\r", "").split("\n"),
                 it.completedMessage.replace("\r", "").split("\n"),
+                it.hideLockedQuests,
+                it.hideWhenLocked,
             )
         }
 

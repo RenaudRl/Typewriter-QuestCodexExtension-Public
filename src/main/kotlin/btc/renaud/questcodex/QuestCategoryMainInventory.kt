@@ -21,7 +21,9 @@ class QuestCategoryMainInventory(
     var currentPage: Int = 0,
 ) : InventoryHolder {
     private val categories: List<QuestCategory> =
-        (parent?.subCategories ?: QuestCategoryRegistry.roots()).sortedBy { it.title }
+        (parent?.subCategories ?: QuestCategoryRegistry.roots())
+            .sortedBy { it.title }
+            .filter { !(it.hideWhenLocked && it.categoryStatus(player) == CategoryStatus.BLOCKED) }
     private val isSubMenu: Boolean = parent != null
     private val rows: Int = if (isSubMenu) codexSubMenuRows.coerceIn(2, 6) else codexMainMenuRows.coerceIn(2, 6)
     private val categoriesPerRow: Int =

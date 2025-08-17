@@ -37,6 +37,10 @@ class QuestCategoryDefinitionEntry(
     val activeCriteria: List<Criteria> = emptyList(),
     @Help("Criteria required for the category to be considered completed")
     val completedCriteria: List<Criteria> = emptyList(),
+    @Help("Hide quests that are locked from this category's menu")
+    val hideLockedQuests: Boolean = false,
+    @Help("Hide this category from menus when it is locked")
+    val hideWhenLocked: Boolean = false,
     @Help("Lore shown when the category is blocked")
     @Placeholder
     @Colored

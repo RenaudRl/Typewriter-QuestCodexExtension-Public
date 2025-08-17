@@ -93,11 +93,16 @@ class QuestCategoryInventory(
         inventory.clear()
         slotToQuest.clear()
 
+        val availableQuests = if (category.hideLockedQuests) {
+            quests.filter { it.questStatus(player) != QuestStatus.INACTIVE }
+        } else {
+            quests
+        }
         val filteredQuests = when (sort) {
-            SortOption.ALL -> quests
-            SortOption.COMPLETED -> quests.filter { it.questStatus(player) == QuestStatus.COMPLETED }
-            SortOption.IN_PROGRESS -> quests.filter { it.questStatus(player) == QuestStatus.ACTIVE }
-            SortOption.NOT_STARTED -> quests.filter { it.questStatus(player) == QuestStatus.INACTIVE }
+            SortOption.ALL -> availableQuests
+            SortOption.COMPLETED -> availableQuests.filter { it.questStatus(player) == QuestStatus.COMPLETED }
+            SortOption.IN_PROGRESS -> availableQuests.filter { it.questStatus(player) == QuestStatus.ACTIVE }
+            SortOption.NOT_STARTED -> availableQuests.filter { it.questStatus(player) == QuestStatus.INACTIVE }
         }
         val sortedQuests = filteredQuests.sortedBy { it.displayName.get(player).parsePlaceholders(player) }
         filteredQuestsCount = filteredQuests.size

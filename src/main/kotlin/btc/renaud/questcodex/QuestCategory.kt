@@ -23,6 +23,10 @@ data class QuestCategory(
     var item: Item = Item.Empty,
     /** Optional name color/style override for main menu. */
     var nameColor: String = "",
+    /** Whether to hide quests that are locked in the menu. */
+    var hideLockedQuests: Boolean = false,
+    /** Whether to hide this category from menus when it is locked. */
+    var hideWhenLocked: Boolean = false,
     /** Criteria determining when the category becomes active. */
     var activeCriteria: List<Criteria> = emptyList(),
     /** Criteria determining when the category is completed. */
@@ -64,6 +68,8 @@ object QuestCategoryRegistry {
         blockedMessage: List<String> = emptyList(),
         activeMessage: List<String> = emptyList(),
         completedMessage: List<String> = emptyList(),
+        hideLockedQuests: Boolean = false,
+        hideWhenLocked: Boolean = false,
     ): QuestCategory {
         val key = name.lowercase()
         val category = categories.getOrPut(key) { QuestCategory(name) }
@@ -87,6 +93,8 @@ object QuestCategoryRegistry {
         category.blockedMessage = blockedMessage
         category.activeMessage = activeMessage
         category.completedMessage = completedMessage
+        category.hideLockedQuests = hideLockedQuests
+        category.hideWhenLocked = hideWhenLocked
         return category
     }
 

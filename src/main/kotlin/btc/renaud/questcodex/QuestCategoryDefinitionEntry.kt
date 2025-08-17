@@ -25,6 +25,7 @@ class QuestCategoryDefinitionEntry(
     @Help("Parent category this category belongs to")
     val parent: String = "",
     @Help("Title used for the menu inventory")
+    @Placeholder
     val title: String = "",
     @Help("Number of rows in the inventory menu (3-6)")
     val rows: Int = 3,
@@ -32,6 +33,7 @@ class QuestCategoryDefinitionEntry(
     @ContentEditor(HoldingItemContentMode::class)
     val item: Item = Item.Empty,
     @Help("Color/style applied to the category name in the menu")
+    @Placeholder
     val nameColor: String = "",
     @Help("Criteria required for the category to become active")
     val activeCriteria: List<Criteria> = emptyList(),

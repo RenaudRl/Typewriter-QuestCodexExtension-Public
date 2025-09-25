@@ -2,9 +2,11 @@ package btc.renaud.questcodex
 
 import com.typewritermc.core.entries.Ref
 import com.typewritermc.engine.paper.entry.Criteria
+import com.typewritermc.engine.paper.plugin
 import com.typewritermc.engine.paper.entry.matches
 import com.typewritermc.engine.paper.utils.item.Item
 import com.typewritermc.quest.QuestEntry
+import com.typewritermc.quest.QuestStatus
 import org.bukkit.entity.Player
 
 /**
@@ -23,6 +25,10 @@ data class QuestCategory(
     var item: Item = Item.Empty,
     /** Optional name color/style override for main menu. */
     var nameColor: String = "",
+    /** Optional explicit slot of this category inside the menu. */
+    var slot: Int? = null,
+    /** Custom quest slots for the quest menu. */
+    var questSlots: List<Int> = emptyList(),
     /** Whether to hide quests that are locked in the menu. */
     var hideLockedQuests: Boolean = false,
     /** Whether to hide this category from menus when it is locked. */
@@ -37,7 +43,13 @@ data class QuestCategory(
     var activeMessage: List<String> = emptyList(),
     /** Lore shown when the category is completed. */
     var completedMessage: List<String> = emptyList(),
+    /** Display order for this category. Categories with lower numbers appear first. */
+    var order: Int = 0,
     val quests: MutableList<Ref<QuestEntry>> = mutableListOf(),
+    /** Optional ordering for quests within this category. */
+    val questOrders: MutableMap<String, Int> = mutableMapOf(),
+    /** Optional quest item overrides per quest and status. */
+    val questItems: MutableMap<String, QuestItemOverrides> = mutableMapOf(),
     /** Optional restriction messages for quests in this category. */
     val restrictions: MutableMap<String, List<String>> = mutableMapOf(),
     /** Parent category if this category is a sub-category. */
@@ -45,6 +57,27 @@ data class QuestCategory(
     /** Child categories registered under this category. */
     val subCategories: MutableList<QuestCategory> = mutableListOf(),
 )
+
+data class QuestItemOverrides(
+    val notStarted: Item = Item.Empty,
+    val inProgress: Item = Item.Empty,
+    val completed: Item = Item.Empty,
+) {
+    fun hasOverrides(): Boolean =
+        notStarted != Item.Empty || inProgress != Item.Empty || completed != Item.Empty
+
+    fun itemFor(status: QuestStatus): Item = when (status) {
+        QuestStatus.INACTIVE -> notStarted
+        QuestStatus.ACTIVE -> inProgress
+        QuestStatus.COMPLETED -> completed
+    }
+
+    fun overrideWith(other: QuestItemOverrides): QuestItemOverrides = QuestItemOverrides(
+        notStarted = if (other.notStarted != Item.Empty) other.notStarted else notStarted,
+        inProgress = if (other.inProgress != Item.Empty) other.inProgress else inProgress,
+        completed = if (other.completed != Item.Empty) other.completed else completed,
+    )
+}
 
 /**
  * Simple registry used by the extension to manage quest categories.
@@ -63,6 +96,9 @@ object QuestCategoryRegistry {
         item: Item = Item.Empty,
         nameColor: String = "",
         parent: String = "",
+        order: Int = 0,
+        slot: Int? = null,
+        questSlots: List<Int> = emptyList(),
         activeCriteria: List<Criteria> = emptyList(),
         completedCriteria: List<Criteria> = emptyList(),
         blockedMessage: List<String> = emptyList(),
@@ -81,6 +117,12 @@ object QuestCategoryRegistry {
         if (nameColor.isNotBlank()) {
             category.nameColor = nameColor
         }
+        if (slot != null && slot >= 0) {
+            category.slot = slot
+        }
+        if (questSlots.isNotEmpty()) {
+            category.questSlots = questSlots.filter { it >= 0 }
+        }
         if (parent.isNotBlank()) {
             val parentCategory = ensure(parent)
             category.parent = parentCategory
@@ -88,6 +130,7 @@ object QuestCategoryRegistry {
                 parentCategory.subCategories.add(category)
             }
         }
+        category.order = order
         category.activeCriteria = activeCriteria
         category.completedCriteria = completedCriteria
         category.blockedMessage = blockedMessage
@@ -111,10 +154,31 @@ object QuestCategoryRegistry {
     /**
      * Add a quest to a category, creating the category if needed.
      */
-    fun addQuest(categoryName: String, quest: Ref<QuestEntry>) {
+    fun addQuest(
+        categoryName: String,
+        questRef: Ref<QuestEntry>,
+        quest: QuestEntry,
+        order: Int? = null,
+        overrides: QuestItemOverrides? = null,
+    ) {
         val category = ensure(categoryName)
-        if (!category.quests.contains(quest)) {
-            category.quests.add(quest)
+        if (!category.quests.contains(questRef)) {
+            category.quests.add(questRef)
+        }
+        if (order != null) {
+            category.questOrders[quest.id] = order
+        } else {
+            category.questOrders.remove(quest.id)
+        }
+        overrides?.takeIf { it.hasOverrides() }?.let { newOverrides ->
+            val existingOverrides = category.questItems[quest.id]
+            val merged = existingOverrides?.overrideWith(newOverrides) ?: newOverrides
+            if (existingOverrides != null && merged != existingOverrides) {
+                plugin.logger.fine(
+                    "[QuestCodex] Updating quest item overrides for quest ${quest.id} in category ${category.name}."
+                )
+            }
+            category.questItems[quest.id] = merged
         }
     }
 
@@ -131,12 +195,16 @@ object QuestCategoryRegistry {
     /**
      * Return all registered categories.
      */
-    fun all(): Collection<QuestCategory> = categories.values
+    fun all(): Collection<QuestCategory> = categories.values.sortedWith(
+        compareBy({ if (it.order == 0) Int.MAX_VALUE else it.order }, { it.title })
+    )
 
     /**
      * Return root categories (those without a parent).
      */
-    fun roots(): Collection<QuestCategory> = categories.values.filter { it.parent == null }
+    fun roots(): Collection<QuestCategory> = categories.values.filter { it.parent == null }.sortedWith(
+        compareBy({ if (it.order == 0) Int.MAX_VALUE else it.order }, { it.title })
+    )
 }
 
 /**

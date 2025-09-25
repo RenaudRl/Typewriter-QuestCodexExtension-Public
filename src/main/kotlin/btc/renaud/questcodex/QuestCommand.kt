@@ -4,6 +4,7 @@ import com.typewritermc.core.entries.ref
 import com.typewritermc.core.extension.annotations.TypewriterCommand
 import com.typewritermc.engine.paper.command.dsl.*
 import com.typewritermc.quest.QuestEntry
+import com.typewritermc.quest.QuestStatus
 import com.typewritermc.quest.trackQuest
 import com.typewritermc.quest.unTrackQuest
 
@@ -15,7 +16,11 @@ fun CommandTree.questCommand() = literal("quest") {
         withPermission("typewriter.quest.track")
         entry<QuestEntry>("quest") { quest ->
             executePlayerOrTarget { target ->
-                target.trackQuest(quest().ref())
+                val questEntry = quest()
+                if (questEntry.questStatus(target) != QuestStatus.ACTIVE) {
+                    return@executePlayerOrTarget
+                }
+                target.trackQuest(questEntry.ref())
             }
         }
     }

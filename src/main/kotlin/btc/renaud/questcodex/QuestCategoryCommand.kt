@@ -19,7 +19,7 @@ fun CommandTree.questCodexCommand() = literal("questcodex") {
             return@executes
         }
         player.openInventory(QuestCategoryMainInventory(player).getInventory())
-        if (codexSoundMenuOpen.isNotBlank()) player.playCodexSound(codexSoundMenuOpen)
+        player.playCodexSound(codexSoundMenuOpen)
     }
 
     // /questcodex <category> [sort]
@@ -44,7 +44,7 @@ fun CommandTree.questCodexCommand() = literal("questcodex") {
                 QuestCategoryInventory(player, questCategory).getInventory()
             }
             player.openInventory(inventory)
-            if (codexSoundMenuOpen.isNotBlank()) player.playCodexSound(codexSoundMenuOpen)
+            player.playCodexSound(codexSoundMenuOpen)
         }
 
         string("sort") { sort ->
@@ -75,7 +75,7 @@ fun CommandTree.questCodexCommand() = literal("questcodex") {
                     QuestCategoryInventory(player, questCategory, option).getInventory()
                 }
                 player.openInventory(inventory)
-                if (codexSoundMenuOpen.isNotBlank()) player.playCodexSound(codexSoundMenuOpen)
+                player.playCodexSound(codexSoundMenuOpen)
             }
         }
     }

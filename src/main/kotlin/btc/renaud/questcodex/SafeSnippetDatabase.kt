@@ -12,6 +12,14 @@ import org.koin.core.component.inject
 import kotlin.reflect.KClass
 import kotlin.reflect.safeCast
 
+/**
+ * Replacement [SnippetDatabase] that gracefully handles malformed YAML files.
+ *
+ * The default implementation throws a [NullPointerException] when the backing
+ * `snippets.yml` contains invalid nodes. This version catches those errors and
+ * falls back to the provided default value, preventing the engine from
+ * spamming the server log while ticking.
+ */
 @Singleton
 class SafeSnippetDatabase : SnippetDatabase, KoinComponent {
     private val plugin: JavaPlugin by inject()

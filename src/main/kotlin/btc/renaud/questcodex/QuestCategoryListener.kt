@@ -1,6 +1,7 @@
 package btc.renaud.questcodex
 
 import com.typewritermc.core.entries.ref
+import com.typewritermc.quest.QuestStatus
 import com.typewritermc.quest.isQuestTracked
 import com.typewritermc.quest.trackQuest
 import com.typewritermc.quest.unTrackQuest
@@ -39,8 +40,8 @@ class QuestCategoryListener : Listener {
                         if (holder.currentPage > 0) {
                             holder.loadPage(holder.currentPage - 1)
                             player.openInventory(holder.getInventory())
-                            if (codexSoundButtonPrevious.isNotBlank()) player.playCodexSound(codexSoundButtonPrevious)
-                            if (codexSoundMenuSwitch.isNotBlank()) player.playCodexSound(codexSoundMenuSwitch)
+                            player.playCodexSound(codexSoundButtonPrevious)
+                            player.playCodexSound(codexSoundMenuSwitch)
                         }
                     }
                     holder.nextSlot -> {
@@ -48,37 +49,41 @@ class QuestCategoryListener : Listener {
                         if (holder.currentPage < maxPage) {
                             holder.loadPage(holder.currentPage + 1)
                             player.openInventory(holder.getInventory())
-                            if (codexSoundButtonNext.isNotBlank()) player.playCodexSound(codexSoundButtonNext)
-                            if (codexSoundMenuSwitch.isNotBlank()) player.playCodexSound(codexSoundMenuSwitch)
+                            player.playCodexSound(codexSoundButtonNext)
+                            player.playCodexSound(codexSoundMenuSwitch)
                         }
                     }
                     holder.sortSlot -> {
                         holder.sort = holder.sort.next()
                         holder.loadPage(0)
                         player.openInventory(holder.getInventory())
-                        if (codexSoundButtonSort.isNotBlank()) player.playCodexSound(codexSoundButtonSort)
-                        if (codexSoundMenuSwitch.isNotBlank()) player.playCodexSound(codexSoundMenuSwitch)
+                        player.playCodexSound(codexSoundButtonSort)
+                        player.playCodexSound(codexSoundMenuSwitch)
                     }
                     holder.backSlot -> {
                         val parent = holder.category.parent
                         player.openInventory(QuestCategoryMainInventory(player, parent).getInventory())
-                        if (codexSoundButtonBack.isNotBlank()) player.playCodexSound(codexSoundButtonBack)
-                        if (codexSoundMenuSwitch.isNotBlank()) player.playCodexSound(codexSoundMenuSwitch)
+                        player.playCodexSound(codexSoundButtonBack)
+                        player.playCodexSound(codexSoundMenuSwitch)
                     }
                     else -> {
                         val quest = holder.questForSlot(event.rawSlot) ?: return
                         if (event.isLeftClick) {
                             val ref = quest.ref()
+                            val status = quest.questStatus(player)
+                            if (status != QuestStatus.ACTIVE) {
+                                return
+                            }
                             if (player isQuestTracked ref) {
                                 player.unTrackQuest()
-                                if (codexSoundButtonQuestUntrack.isNotBlank()) player.playCodexSound(codexSoundButtonQuestUntrack)
+                                player.playCodexSound(codexSoundButtonQuestUntrack)
                             } else {
                                 player.trackQuest(ref)
-                                if (codexSoundButtonQuestTrack.isNotBlank()) player.playCodexSound(codexSoundButtonQuestTrack)
+                                player.playCodexSound(codexSoundButtonQuestTrack)
                             }
                             holder.loadPage(holder.currentPage)
                             player.openInventory(holder.getInventory())
-                            if (codexSoundMenuSwitch.isNotBlank()) player.playCodexSound(codexSoundMenuSwitch)
+                            player.playCodexSound(codexSoundMenuSwitch)
                         }
                     }
                 }
@@ -96,23 +101,23 @@ class QuestCategoryListener : Listener {
                         if (holder.currentPage > 0) {
                             holder.loadPage(holder.currentPage - 1)
                             player.openInventory(holder.getInventory())
-                            if (codexSoundButtonPrevious.isNotBlank()) player.playCodexSound(codexSoundButtonPrevious)
-                            if (codexSoundMenuSwitch.isNotBlank()) player.playCodexSound(codexSoundMenuSwitch)
+                            player.playCodexSound(codexSoundButtonPrevious)
+                            player.playCodexSound(codexSoundMenuSwitch)
                         }
                     }
                     holder.nextSlot() -> {
                         if (holder.currentPage < holder.maxPage()) {
                             holder.loadPage(holder.currentPage + 1)
                             player.openInventory(holder.getInventory())
-                            if (codexSoundButtonNext.isNotBlank()) player.playCodexSound(codexSoundButtonNext)
-                            if (codexSoundMenuSwitch.isNotBlank()) player.playCodexSound(codexSoundMenuSwitch)
+                            player.playCodexSound(codexSoundButtonNext)
+                            player.playCodexSound(codexSoundMenuSwitch)
                         }
                     }
                     holder.backSlot() -> {
                         val parent = holder.parent()
                         player.openInventory(QuestCategoryMainInventory(player, parent?.parent).getInventory())
-                        if (codexSoundButtonBack.isNotBlank()) player.playCodexSound(codexSoundButtonBack)
-                        if (codexSoundMenuSwitch.isNotBlank()) player.playCodexSound(codexSoundMenuSwitch)
+                        player.playCodexSound(codexSoundButtonBack)
+                        player.playCodexSound(codexSoundMenuSwitch)
                     }
                     holder.infoSlot() -> {
                         // No action for info button
@@ -127,8 +132,8 @@ class QuestCategoryListener : Listener {
                         } else {
                             player.openInventory(QuestCategoryInventory(player, category).getInventory())
                         }
-                        if (codexSoundButtonCategory.isNotBlank()) player.playCodexSound(codexSoundButtonCategory)
-                        if (codexSoundMenuOpen.isNotBlank()) player.playCodexSound(codexSoundMenuOpen)
+                        player.playCodexSound(codexSoundButtonCategory)
+                        player.playCodexSound(codexSoundMenuOpen)
                     }
                 }
             }

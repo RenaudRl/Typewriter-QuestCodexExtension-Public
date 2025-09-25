@@ -26,14 +26,22 @@ class QuestCategoryDefinitionEntry(
     val parent: String = "",
     @Help("Title used for the menu inventory")
     @Placeholder
+    @Colored
     val title: String = "",
     @Help("Number of rows in the inventory menu (3-6)")
     val rows: Int = 3,
+    @Help("Display order for this category, lower numbers appear first")
+    val order: Int = 0,
+    @Help("Explicit slot for the category in the menu. Use -1 to fallback to the order.")
+    val slot: Int = -1,
+    @Help("Exact inventory slots (single index or ranges like 2-10) used to display quests. Leave empty for automatic layout.")
+    val questSlots: List<String> = emptyList(),
     @Help("Item used as the icon for this category")
     @ContentEditor(HoldingItemContentMode::class)
     val item: Item = Item.Empty,
     @Help("Color/style applied to the category name in the menu")
     @Placeholder
+    @Colored
     val nameColor: String = "",
     @Help("Criteria required for the category to become active")
     val activeCriteria: List<Criteria> = emptyList(),

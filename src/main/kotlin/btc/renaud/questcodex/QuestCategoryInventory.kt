@@ -1,11 +1,11 @@
 package btc.renaud.questcodex
 
 import com.typewritermc.engine.paper.extensions.placeholderapi.parsePlaceholders
-import com.typewritermc.engine.paper.snippets.snippet
 import com.typewritermc.engine.paper.utils.asMini
+import com.typewritermc.engine.paper.utils.item.Item
 import com.typewritermc.engine.paper.utils.limitLineLength
-import com.typewritermc.engine.paper.utils.splitComponents
 import com.typewritermc.engine.paper.utils.server
+import com.typewritermc.engine.paper.utils.splitComponents
 import com.typewritermc.engine.paper.entry.descendants
 import com.typewritermc.engine.paper.entry.entries.LinesEntry
 import com.typewritermc.core.entries.ref
@@ -14,26 +14,16 @@ import com.typewritermc.quest.QuestEntry
 import com.typewritermc.quest.QuestStatus
 import com.typewritermc.quest.questShowingObjectives
 import com.typewritermc.quest.isQuestTracked
-import btc.renaud.questcodex.setModelData
-import btc.renaud.questcodex.asMiniWithoutItalic
-import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 
-fun Inventory.fillWith(player: Player) {
-    val fillItem = ItemStack(
-        Material.getMaterial(codexMenuFillMaterial) ?: Material.GRAY_STAINED_GLASS_PANE
-    ).apply {
-        itemMeta = itemMeta.apply {
-            displayName(codexMenuFillName.parsePlaceholders(player).asMiniWithoutItalic())
-            lore(codexMenuFillLore.map { it.parsePlaceholders(player).asMiniWithoutItalic() })
-            if (codexMenuFillCMD != 0) setModelData(codexMenuFillCMD)
-        }
-    }
+fun Inventory.fillWith(player: Player, template: ItemTemplate) {
+    val fillItem = template.buildItem(player, Material.GRAY_STAINED_GLASS_PANE)
     for (i in 0 until size) {
         if (getItem(i) == null) {
             setItem(i, fillItem)
@@ -51,6 +41,7 @@ class QuestCategoryInventory(
     var sort: SortOption = SortOption.ALL,
 ) : InventoryHolder {
 
+    private val menuConfig = QuestCodexConfig.questMenu
     private val inventory: Inventory = server.createInventory(
         this,
         category.rows * 9,
@@ -68,20 +59,18 @@ class QuestCategoryInventory(
     var currentPage = 0
 
     init {
-        val questRows = (category.rows - 2).coerceAtLeast(1)
-        val bottomRowStart = (category.rows - 1) * 9
-        val questsPerRow = codexMenuQuestsPerRow.coerceIn(1, 9)
-        questSlots = buildList {
-            for (row in 0 until questRows) {
-                val start = row * 9
-                addAll(start until start + questsPerRow)
-            }
+        val inventorySize = inventory.size
+        val defaultSlots = if (category.questSlots.isNotEmpty()) {
+            category.questSlots.filter { it in 0 until inventorySize }
+        } else {
+            defaultQuestSlots(category.rows, menuConfig.questsPerRow)
         }
+        questSlots = defaultSlots.ifEmpty { defaultQuestSlots(category.rows, menuConfig.questsPerRow) }
 
-        previousSlot = bottomRowStart + codexButtonPreviousColumn.coerceIn(0, 8)
-        nextSlot = bottomRowStart + codexButtonNextColumn.coerceIn(0, 8)
-        sortSlot = bottomRowStart + codexButtonSortColumn.coerceIn(0, 8)
-        backSlot = bottomRowStart + codexButtonBackColumn.coerceIn(0, 8)
+        previousSlot = menuConfig.buttons.previous.resolveSlot(category.rows, inventorySize)
+        nextSlot = menuConfig.buttons.next.resolveSlot(category.rows, inventorySize)
+        sortSlot = menuConfig.buttons.sort.resolveSlot(category.rows, inventorySize)
+        backSlot = menuConfig.buttons.back.resolveSlot(category.rows, inventorySize)
 
         maxQuestsPerPage = questSlots.size
 
@@ -104,7 +93,16 @@ class QuestCategoryInventory(
             SortOption.IN_PROGRESS -> availableQuests.filter { it.questStatus(player) == QuestStatus.ACTIVE }
             SortOption.NOT_STARTED -> availableQuests.filter { it.questStatus(player) == QuestStatus.INACTIVE }
         }
-        val sortedQuests = filteredQuests.sortedBy { it.displayName.get(player).parsePlaceholders(player) }
+        val insertionOrder = category.quests.mapIndexedNotNull { index, ref ->
+            ref.get()?.id?.let { it to index }
+        }.toMap()
+        val sortedQuests = filteredQuests.sortedWith(
+            compareBy<QuestEntry>(
+                { category.questOrders[it.id] ?: Int.MAX_VALUE },
+                { insertionOrder[it.id] ?: Int.MAX_VALUE },
+                { it.displayName.get(player).parsePlaceholders(player) },
+            )
+        )
         filteredQuestsCount = filteredQuests.size
 
         val startIndex = page * maxQuestsPerPage
@@ -136,13 +134,13 @@ class QuestCategoryInventory(
             
             // Build status-specific lore
             val statusLore = when (status) {
-                QuestStatus.COMPLETED -> codexButtonQuestCompletedLore
+                QuestStatus.COMPLETED -> menuConfig.questButtons.completed.lore
                 QuestStatus.INACTIVE -> {
                     val loreLines = mutableListOf<String>()
-                    loreLines.addAll(codexButtonQuestNotStartedLore)
+                    loreLines.addAll(menuConfig.questButtons.notStarted.lore)
                     category.restrictions[quest.id]?.let { extra ->
                         if (extra.isNotEmpty()) {
-                            if (codexButtonQuestNotStartedLore.isNotEmpty()) loreLines.add("")
+                            if (menuConfig.questButtons.notStarted.lore.isNotEmpty()) loreLines.add("")
                             loreLines.addAll(extra)
                         }
                     }
@@ -156,11 +154,11 @@ class QuestCategoryInventory(
                         }
                         loreLines.addAll(objectives.map { it.display(player) })
                     }
-                    loreLines.addAll(codexButtonQuestInProgressLore)
+                    loreLines.addAll(menuConfig.questButtons.inProgress.lore)
                     if (player isQuestTracked ref) {
-                        loreLines.addAll(codexButtonQuestUntrackLore)
+                        loreLines.addAll(menuConfig.questButtons.untrackLore)
                     } else {
-                        loreLines.addAll(codexButtonQuestTrackLore)
+                        loreLines.addAll(menuConfig.questButtons.trackLore)
                     }
                     loreLines
                 }
@@ -179,23 +177,18 @@ class QuestCategoryInventory(
                 lore += components
             }
 
-            val materialKey = when (status) {
-                QuestStatus.COMPLETED -> codexButtonQuestMaterialCompleted
-                QuestStatus.ACTIVE -> codexButtonQuestMaterialInProgress
-                QuestStatus.INACTIVE -> codexButtonQuestMaterialNotStarted
+            val template = when (status) {
+                QuestStatus.COMPLETED -> menuConfig.questButtons.completed
+                QuestStatus.ACTIVE -> menuConfig.questButtons.inProgress
+                QuestStatus.INACTIVE -> menuConfig.questButtons.notStarted
             }
 
-            val cmd = when (status) {
-                QuestStatus.COMPLETED -> codexButtonQuestCMDCompleted
-                QuestStatus.ACTIVE -> codexButtonQuestCMDInProgress
-                QuestStatus.INACTIVE -> codexButtonQuestCMDNotStarted
-            }
-
-            val questButton = ItemStack(Material.getMaterial(materialKey.uppercase()) ?: Material.BARRIER).apply {
+            val overrideItem = category.questItems[quest.id]?.itemFor(status)?.takeIf { it != Item.Empty }
+            val baseStack: ItemStack = overrideItem?.build(player) ?: template.baseItem(player, Material.BARRIER)
+            val questButton = baseStack.apply {
                 itemMeta = itemMeta.apply {
                     displayName(quest.displayName.get(player).parsePlaceholders(player).asMiniWithoutItalic())
                     lore(lore)
-                    setModelData(cmd)
                 }
             }
 
@@ -205,17 +198,10 @@ class QuestCategoryInventory(
 
         // Fill remaining quest slots with a dedicated placeholder
         for (slot in questSlots.drop(questsToDisplay.size)) {
-            val emptyItem = ItemStack(Material.getMaterial(codexMenuEmptyQuestMaterial) ?: Material.GRAY_STAINED_GLASS_PANE).apply {
-                itemMeta = itemMeta.apply {
-                    displayName(codexMenuEmptyQuestName.parsePlaceholders(player).asMiniWithoutItalic())
-                    lore(codexMenuEmptyQuestLore.flatMap { it.split("\n") }.map { it.parsePlaceholders(player).asMiniWithoutItalic() })
-                    setModelData(codexMenuEmptyQuestCMD)
-                }
-            }
-            inventory.setItem(slot, emptyItem)
+            inventory.setItem(slot, menuConfig.emptyQuest.buildItem(player, Material.GRAY_STAINED_GLASS_PANE))
         }
 
-        inventory.fillWith(player)
+        inventory.fillWith(player, menuConfig.fill)
         setupButtons()
     }
 
@@ -223,58 +209,36 @@ class QuestCategoryInventory(
         val maxPage = ((filteredQuestsCount - 1) / maxQuestsPerPage).coerceAtLeast(0)
 
         if (currentPage > 0) {
-            val previousButton = ItemStack(Material.getMaterial(codexButtonPreviousMaterial) ?: Material.BARRIER).apply {
-                itemMeta = itemMeta.apply {
-                    displayName(codexButtonPreviousName.parsePlaceholders(player).asMiniWithoutItalic())
-                    lore(codexButtonPreviousLore.flatMap { it.split("\n") }.map { it.parsePlaceholders(player).asMiniWithoutItalic() })
-                    setModelData(codexButtonPreviousCMD)
-                }
-            }
-            inventory.setItem(previousSlot, previousButton)
+            inventory.setItem(previousSlot, menuConfig.buttons.previous.toItemTemplate().buildItem(player, Material.BARRIER))
         }
 
         if (currentPage < maxPage) {
-            val nextButton = ItemStack(Material.getMaterial(codexButtonNextMaterial) ?: Material.BARRIER).apply {
-                itemMeta = itemMeta.apply {
-                    displayName(codexButtonNextName.parsePlaceholders(player).asMiniWithoutItalic())
-                    lore(codexButtonNextLore.flatMap { it.split("\n") }.map { it.parsePlaceholders(player).asMiniWithoutItalic() })
-                    setModelData(codexButtonNextCMD)
-                }
-            }
-            inventory.setItem(nextSlot, nextButton)
+            inventory.setItem(nextSlot, menuConfig.buttons.next.toItemTemplate().buildItem(player, Material.BARRIER))
         }
 
         val sortLore = mutableListOf<Component>()
         sortLore.add("".asMiniWithoutItalic())
         listOf(
-            SortOption.ALL to codexButtonSortAllName,
-            SortOption.COMPLETED to codexButtonSortCompletedName,
-            SortOption.IN_PROGRESS to codexButtonSortInProgressName,
-            SortOption.NOT_STARTED to codexButtonSortNotStartedName
+            SortOption.ALL to menuConfig.buttons.sort.allName,
+            SortOption.COMPLETED to menuConfig.buttons.sort.completedName,
+            SortOption.IN_PROGRESS to menuConfig.buttons.sort.inProgressName,
+            SortOption.NOT_STARTED to menuConfig.buttons.sort.notStartedName
         ).map { (option, name) ->
-            val prefix = if (sort == option) codexButtonSortSelectedPrefix else ""
-            val format = if (sort == option) codexButtonSortSelectedFormat else codexButtonSortUnselectedFormat
+            val prefix = if (sort == option) menuConfig.buttons.sort.selectedPrefix else ""
+            val format = if (sort == option) menuConfig.buttons.sort.selectedFormat else menuConfig.buttons.sort.unselectedFormat
             format.replace("{prefix}", prefix).replace("{name}", name)
                 .parsePlaceholders(player).asMiniWithoutItalic()
         }.forEach { sortLore.add(it) }
 
-        val sortButton = ItemStack(Material.getMaterial(codexButtonSortTitleMaterial) ?: Material.BARRIER).apply {
-            itemMeta = itemMeta.apply {
-                displayName(codexButtonSortTitleName.parsePlaceholders(player).asMiniWithoutItalic())
-                lore(sortLore)
-                setModelData(codexButtonSortTitleCMD)
-            }
-        }
+        val sortTemplate = menuConfig.buttons.sort
+        val sortButton = sortTemplate.toItemTemplate().buildItem(
+            player,
+            Material.BARRIER,
+            loreOverride = sortLore,
+        )
         inventory.setItem(sortSlot, sortButton)
 
-        val backButton = ItemStack(Material.getMaterial(codexButtonBackMaterial) ?: Material.BARRIER).apply {
-            itemMeta = itemMeta.apply {
-                displayName(codexButtonBackName.parsePlaceholders(player).asMiniWithoutItalic())
-                lore(codexButtonBackLore.flatMap { it.split("\n") }.map { it.parsePlaceholders(player).asMiniWithoutItalic() })
-                setModelData(codexButtonBackCMD)
-            }
-        }
-        inventory.setItem(backSlot, backButton)
+        inventory.setItem(backSlot, menuConfig.buttons.back.toItemTemplate().buildItem(player, Material.BARRIER))
     }
 
     override fun getInventory(): Inventory = inventory
@@ -287,101 +251,15 @@ class QuestCategoryInventory(
     }
 }
 
-// ----- Snippet configuration -----
-val codexButtonPreviousName: String by snippet("codex.menu.button.previous.name", "Previous Page")
-val codexButtonPreviousMaterial: String by snippet("codex.menu.button.previous.material", "ARROW")
-val codexButtonPreviousLore: List<String> by snippet(
-    "codex.menu.button.previous.lore",
-    listOf("<gray>Go to previous page</gray>")
-)
-val codexButtonPreviousColumn: Int by snippet("codex.menu.button.previous.column", 0)
-val codexButtonPreviousCMD: Int by snippet("codex.menu.button.previous.custom-model-data", 0)
-
-val codexButtonNextName: String by snippet("codex.menu.button.next.name", "Next Page")
-val codexButtonNextMaterial: String by snippet("codex.menu.button.next.material", "ARROW")
-val codexButtonNextLore: List<String> by snippet(
-    "codex.menu.button.next.lore",
-    listOf("<gray>Go to next page</gray>")
-)
-val codexButtonNextColumn: Int by snippet("codex.menu.button.next.column", 8)
-val codexButtonNextCMD: Int by snippet("codex.menu.button.next.custom-model-data", 0)
-
-val codexButtonBackName: String by snippet("codex.menu.button.back.name", "Back")
-val codexButtonBackMaterial: String by snippet("codex.menu.button.back.material", "BARRIER")
-val codexButtonBackLore: List<String> by snippet(
-    "codex.menu.button.back.lore",
-    listOf("<gray>Return to categories</gray>")
-)
-val codexButtonBackColumn: Int by snippet("codex.menu.button.back.column", 7)
-val codexButtonBackCMD: Int by snippet("codex.menu.button.back.custom-model-data", 0)
-
-val codexButtonQuestCompletedLore: List<String> by snippet(
-    "codex.menu.button.quest.completed.lore",
-    listOf("<green>✓ Completed</green>")
-)
-val codexButtonQuestNotStartedLore: List<String> by snippet(
-    "codex.menu.button.quest.not-started.lore",
-    listOf("<gray>○ Not Started</gray>")
-)
-val codexButtonQuestInProgressLore: List<String> by snippet(
-    "codex.menu.button.quest.in-progress.lore",
-    listOf("<yellow>⚡ In Progress</yellow>")
-)
-val codexButtonQuestTrackLore: List<String> by snippet(
-    "codex.menu.button.quest.track.lore",
-    listOf("<gray>Click to track</gray>")
-)
-val codexButtonQuestUntrackLore: List<String> by snippet(
-    "codex.menu.button.quest.untrack.lore",
-    listOf("<gray>Click to untrack</gray>")
-)
-val codexButtonQuestMaterialCompleted: String by snippet(
-    "codex.menu.button.quest.completed.material",
-    "ENCHANTED_BOOK"
-)
-val codexButtonQuestMaterialInProgress: String by snippet(
-    "codex.menu.button.quest.in-progress.material",
-    "WRITABLE_BOOK"
-)
-val codexButtonQuestMaterialNotStarted: String by snippet(
-    "codex.menu.button.quest.not-started.material",
-    "BOOK"
-)
-val codexButtonQuestCMDCompleted: Int by snippet("codex.menu.button.quest.completed.custom-model-data", 0)
-val codexButtonQuestCMDInProgress: Int by snippet("codex.menu.button.quest.in-progress.custom-model-data", 0)
-val codexButtonQuestCMDNotStarted: Int by snippet("codex.menu.button.quest.not-started.custom-model-data", 0)
-val codexButtonSortColumn: Int by snippet("codex.menu.button.sort.column", 4)
-val codexButtonSortTitleName: String by snippet("codex.menu.button.sort.title.name", "Sort")
-val codexButtonSortTitleMaterial: String by snippet("codex.menu.button.sort.title.material", "COMPARATOR")
-val codexButtonSortTitleCMD: Int by snippet("codex.menu.button.sort.title.custom-model-data", 0)
-val codexButtonSortSelectedPrefix: String by snippet("codex.menu.button.sort.selected-prefix", "\u2192 ")
-val codexButtonSortSelectedFormat: String by snippet(
-    "codex.menu.button.sort.selected-format",
-    "<green>{prefix}{name}</green>"
-)
-val codexButtonSortUnselectedFormat: String by snippet(
-    "codex.menu.button.sort.unselected-format",
-    "<white>{name}</white>"
-)
-val codexButtonSortAllName: String by snippet("codex.menu.button.sort.all.name", "All Quests")
-val codexButtonSortCompletedName: String by snippet("codex.menu.button.sort.completed.name", "Completed")
-val codexButtonSortInProgressName: String by snippet("codex.menu.button.sort.in-progress.name", "In Progress")
-val codexButtonSortNotStartedName: String by snippet("codex.menu.button.sort.not-started.name", "Not Started")
-
-val codexMenuQuestsPerRow: Int by snippet(
-    "codex.menu.quests-per-row",
-    9,
-    "Number of quests per row in the quest menu."
-)
-val codexMenuFillMaterial: String by snippet("codex.menu.fill.material", "GRAY_STAINED_GLASS_PANE")
-val codexMenuFillName: String by snippet("codex.menu.fill.name", "")
-val codexMenuFillLore: List<String> by snippet("codex.menu.fill.lore", emptyList<String>())
-val codexMenuFillCMD: Int by snippet("codex.menu.fill.custom-model-data", 0)
-
-val codexMenuEmptyQuestMaterial: String by snippet("codex.menu.empty-quest.material", codexMenuFillMaterial)
-val codexMenuEmptyQuestName: String by snippet("codex.menu.empty-quest.name", "")
-val codexMenuEmptyQuestLore: List<String> by snippet(
-    "codex.menu.empty-quest.lore",
-    listOf("<gray>No quests available</gray>")
-)
-val codexMenuEmptyQuestCMD: Int by snippet("codex.menu.empty-quest.custom-model-data", 0)
+private fun defaultQuestSlots(rows: Int, questsPerRow: Int): List<Int> {
+    val questRows = (rows - 2).coerceAtLeast(1)
+    val perRow = questsPerRow.coerceIn(1, 9)
+    return buildList {
+        for (row in 0 until questRows) {
+            val start = row * 9
+            for (column in 0 until perRow) {
+                add(start + column)
+            }
+        }
+    }
+}

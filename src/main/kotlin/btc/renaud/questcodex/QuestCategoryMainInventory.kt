@@ -120,7 +120,9 @@ class QuestCategoryMainInventory(
             slots[placement.slot] = placement.category
         }
 
-        inventory.fillWith(player, menuConfig.fill)
+        if (menuConfig.fillEnabled) {
+            inventory.fillWith(player, menuConfig.fill)
+        }
 
         if (currentPage > 0) {
             inventory.setItem(previousSlot, menuConfig.previousButton.toItemTemplate().buildItem(player, Material.ARROW))

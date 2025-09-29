@@ -176,6 +176,8 @@ data class QuestMenuButtonSettings(
 data class QuestMenuSettings(
     @Help("Number of quests displayed per row when no explicit layout is provided")
     val questsPerRow: Int = 9,
+    @Help("Whether to fill empty slots in the quest menu with the configured fill item")
+    val fillEnabled: Boolean = true,
     val fill: ItemTemplate = ItemTemplate(item = materialItem(Material.GRAY_STAINED_GLASS_PANE)),
     @Help("Placeholder item used when a quest slot is empty")
     val emptyQuest: ItemTemplate = ItemTemplate(
@@ -217,6 +219,8 @@ data class CategoryMenuSettings(
     @Colored
     @MultiLine
     val categoryLore: List<String> = listOf("<gray>Click to view quests</gray>"),
+    @Help("Whether to fill empty slots in the category menu with the configured fill item")
+    val fillEnabled: Boolean = true,
     val fill: ItemTemplate = ItemTemplate(item = materialItem(Material.GRAY_STAINED_GLASS_PANE)),
     val previousButton: NavigationButtonTemplate = NavigationButtonTemplate(
         column = 0,

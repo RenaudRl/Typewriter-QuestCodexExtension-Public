@@ -201,7 +201,9 @@ class QuestCategoryInventory(
             inventory.setItem(slot, menuConfig.emptyQuest.buildItem(player, Material.GRAY_STAINED_GLASS_PANE))
         }
 
-        inventory.fillWith(player, menuConfig.fill)
+        if (menuConfig.fillEnabled) {
+            inventory.fillWith(player, menuConfig.fill)
+        }
         setupButtons()
     }
 

@@ -118,16 +118,19 @@ data class QuestButtonSettings(
     @Help("Appearance when a quest is completed")
     val completed: ItemTemplate = ItemTemplate(
         item = materialItem(Material.ENCHANTED_BOOK),
+        name = "<green>Completed</green>",
         lore = listOf("<green>✓ Completed</green>"),
     ),
     @Help("Appearance when a quest is in progress")
     val inProgress: ItemTemplate = ItemTemplate(
         item = materialItem(Material.WRITABLE_BOOK),
+        name = "<yellow>In Progress</yellow>",
         lore = listOf("<yellow>⚡ In Progress</yellow>"),
     ),
     @Help("Appearance when a quest has not started")
     val notStarted: ItemTemplate = ItemTemplate(
         item = materialItem(Material.BOOK),
+        name = "<gray>Not Started</gray>",
         lore = listOf("<gray>○ Not Started</gray>"),
     ),
     @Help("Additional lore shown to track a quest")
@@ -265,6 +268,15 @@ object QuestCodexDefaults {
     )
     val questMenu: QuestMenuSettings = QuestMenuSettings()
     val sounds: SoundSettings = SoundSettings()
+
+    fun settingsEntry(): QuestCodexSettingsEntry = QuestCodexSettingsEntry(
+        id = "quest_codex_settings_defaults",
+        name = "Quest Codex Defaults",
+        mainMenu = mainMenu,
+        subMenu = subMenu,
+        questMenu = questMenu,
+        sounds = sounds,
+    )
 }
 
 /** Holds the active quest codex configuration. */

@@ -144,7 +144,8 @@ class QuestCategoryMainInventory(
             itemMeta = itemMeta.apply {
                 val styleString = if (category.nameColor.isNotBlank()) category.nameColor else menuConfig.categoryNameColor
                 val styleComponent = styleString.parsePlaceholders(player).asMini()
-                var nameComponent = category.title.parsePlaceholders(player).asMiniWithoutItalic()
+                val rawIconName = if (category.iconName.isNotBlank()) category.iconName else category.title
+                var nameComponent = rawIconName.parsePlaceholders(player).asMiniWithoutItalic()
                 nameComponent = nameComponent.style(styleComponent.style())
                 if (menuConfig.categoryNameBold) {
                     nameComponent = nameComponent.decoration(TextDecoration.BOLD, true)

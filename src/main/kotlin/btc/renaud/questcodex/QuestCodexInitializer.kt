@@ -22,29 +22,36 @@ object QuestCodexInitializer : Initializable {
         manager.registerEvents(listener, plugin)
 
         QuestCodexConfig.reset()
-        Query.find<QuestCodexSettingsEntry>().forEach { entry ->
-            QuestCodexConfig.apply(entry)
+        val settingsEntries = Query.find<QuestCodexSettingsEntry>().toList()
+        if (settingsEntries.isEmpty()) {
+            plugin.logger.fine("[QuestCodex] No quest_codex_settings entry found; applying default configuration.")
+            QuestCodexConfig.apply(QuestCodexDefaults.settingsEntry())
+        } else {
+            settingsEntries.forEach { entry ->
+                QuestCodexConfig.apply(entry)
+            }
         }
 
         // Register categories defined through typewriter entries
         Query.find<QuestCategoryDefinitionEntry>().forEach {
             QuestCategoryRegistry.register(
-                it.category,
-                it.title.ifBlank { it.category },
-                it.rows,
-                it.item,
-                it.nameColor,
-                it.parent,
-                it.order,
-                it.slot.takeIf { slot -> slot >= 0 },
-                parseQuestSlots(it.questSlots, it.category),
-                it.activeCriteria,
-                it.completedCriteria,
-                it.blockedMessage.replace("\r", "").split("\n"),
-                it.activeMessage.replace("\r", "").split("\n"),
-                it.completedMessage.replace("\r", "").split("\n"),
-                it.hideLockedQuests,
-                it.hideWhenLocked,
+                name = it.category,
+                title = it.title.ifBlank { it.category },
+                rows = it.rows,
+                item = it.item,
+                nameColor = it.nameColor,
+                parent = it.parent,
+                order = it.order,
+                slot = it.slot.takeIf { slot -> slot >= 0 },
+                questSlots = parseQuestSlots(it.questSlots, it.category),
+                activeCriteria = it.activeCriteria,
+                completedCriteria = it.completedCriteria,
+                blockedMessage = it.blockedMessage.replace("\r", "").split("\n"),
+                activeMessage = it.activeMessage.replace("\r", "").split("\n"),
+                completedMessage = it.completedMessage.replace("\r", "").split("\n"),
+                hideLockedQuests = it.hideLockedQuests,
+                hideWhenLocked = it.hideWhenLocked,
+                iconName = it.iconName,
             )
         }
 

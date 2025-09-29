@@ -19,6 +19,8 @@ data class QuestCategory(
     val name: String,
     /** Title used for the menu inventory. */
     var title: String = name,
+    /** Display name applied to the category icon. */
+    var iconName: String = name,
     /** Number of rows shown in the menu (3-6). */
     var rows: Int = 3,
     /** Item used as icon for this category. */
@@ -106,10 +108,12 @@ object QuestCategoryRegistry {
         completedMessage: List<String> = emptyList(),
         hideLockedQuests: Boolean = false,
         hideWhenLocked: Boolean = false,
+        iconName: String = "",
     ): QuestCategory {
         val key = name.lowercase()
         val category = categories.getOrPut(key) { QuestCategory(name) }
         category.title = title
+        category.iconName = iconName.takeIf { it.isNotBlank() } ?: title
         category.rows = rows.coerceIn(3, 6)
         if (item != Item.Empty) {
             category.item = item

@@ -39,6 +39,10 @@ class QuestCategoryDefinitionEntry(
     @Help("Item used as the icon for this category")
     @ContentEditor(HoldingItemContentMode::class)
     val item: Item = Item.Empty,
+    @Help("Display name used for the category icon in menus")
+    @Placeholder
+    @Colored
+    val iconName: String = "",
     @Help("Color/style applied to the category name in the menu")
     @Placeholder
     @Colored

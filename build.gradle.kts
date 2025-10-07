@@ -1,11 +1,9 @@
 repositories {
      mavenCentral()
-    maven("https://repo.tcoded.com/releases")
 }
 dependencies {
     implementation("com.typewritermc:QuestExtension:0.9.0")
     implementation(kotlin("reflect"))
-    implementation("com.tcoded:FoliaLib:0.5.1")
 }
 
 plugins {

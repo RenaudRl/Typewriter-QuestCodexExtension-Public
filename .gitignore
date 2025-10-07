@@ -1,0 +1,8 @@
+
+
+#
+.c*
+.vscode
+.gradle
+.kotlin
+build

@@ -6,7 +6,6 @@ import com.typewritermc.core.extension.annotations.Singleton
 import com.typewritermc.engine.paper.plugin
 import org.bukkit.Bukkit
 import org.bukkit.event.inventory.InventoryClickEvent
-import java.util.logging.Level
 
 /**
  * Basic initializer for the Quest Codex extension.
@@ -113,17 +112,7 @@ object QuestCodexInitializer : Initializable {
     }
 
     private fun runSynchronously(action: () -> Unit) {
-        val future = Bukkit.getScheduler().callSyncMethod(plugin) {
-            action()
-            null
-        }
-        try {
-            future.get()
-        } catch (throwable: Exception) {
-            future.cancel(true)
-            plugin.logger.log(Level.SEVERE, "[QuestCodex] Failed to execute shutdown action", throwable)
-            action()
-        }
+        FoliaScheduler.runSync(action)
     }
 }
 

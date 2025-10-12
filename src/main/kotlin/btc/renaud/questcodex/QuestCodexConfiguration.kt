@@ -241,6 +241,10 @@ data class CategoryMenuSettings(
         lore = listOf("<gray>Completed: %typewriter_total_completed%/%typewriter_total_quests%</gray>"),
     ),
     val backButton: NavigationButtonTemplate? = null,
+    @Help("Commands executed when the back button is clicked. Leave empty to use the default navigation behaviour.")
+    @Placeholder
+    @MultiLine
+    val backButtonCommands: List<String> = emptyList(),
 )
 
 /**

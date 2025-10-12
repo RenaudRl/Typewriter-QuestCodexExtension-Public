@@ -82,36 +82,47 @@ class QuestCategoryInventory(
         inventory.clear()
         slotToQuest.clear()
 
-        val availableQuests = if (category.hideLockedQuests) {
-            quests.filter { it.questStatus(player) != QuestStatus.INACTIVE }
-        } else {
-            quests
-        }
-        val filteredQuests = when (sort) {
-            SortOption.ALL -> availableQuests
-            SortOption.COMPLETED -> availableQuests.filter { it.questStatus(player) == QuestStatus.COMPLETED }
-            SortOption.IN_PROGRESS -> availableQuests.filter { it.questStatus(player) == QuestStatus.ACTIVE }
-            SortOption.NOT_STARTED -> availableQuests.filter { it.questStatus(player) == QuestStatus.INACTIVE }
+        val questViews = quests.map { quest -> quest to quest.questStatus(player) }
+            .let { pairs ->
+                if (category.hideLockedQuests) {
+                    pairs.filter { it.second != QuestStatus.INACTIVE }
+                } else {
+                    pairs
+                }
+            }
+            .map { (quest, status) -> QuestView(quest, status) }
+        val filteredViews = when (sort) {
+            SortOption.ALL -> questViews
+            SortOption.COMPLETED -> questViews.filter { it.status == QuestStatus.COMPLETED }
+            SortOption.IN_PROGRESS -> questViews.filter { it.status == QuestStatus.ACTIVE }
+            SortOption.NOT_STARTED -> questViews.filter { it.status == QuestStatus.INACTIVE }
         }
         val insertionOrder = category.quests.mapIndexedNotNull { index, ref ->
             ref.get()?.id?.let { it to index }
         }.toMap()
-        val sortedQuests = filteredQuests.sortedWith(
-            compareBy<QuestEntry>(
-                { category.questOrders[it.id] ?: Int.MAX_VALUE },
-                { insertionOrder[it.id] ?: Int.MAX_VALUE },
-                { it.displayName.get(player).parsePlaceholders(player) },
+        val visibleViews = filteredViews.filter { view ->
+            val overrides = category.questDisplays[view.quest.id]
+            val stateOverride = overrides?.state(view.status)
+            stateOverride?.hideQuest != true
+        }
+        val sortedViews = visibleViews.sortedWith(
+            compareBy<QuestView>(
+                { category.questOrders[it.quest.id] ?: Int.MAX_VALUE },
+                { insertionOrder[it.quest.id] ?: Int.MAX_VALUE },
+                { it.quest.displayName.get(player).parsePlaceholders(player) },
             )
         )
-        filteredQuestsCount = filteredQuests.size
+        filteredQuestsCount = visibleViews.size
 
         val startIndex = page * maxQuestsPerPage
-        val endIndex = (startIndex + maxQuestsPerPage).coerceAtMost(sortedQuests.size)
-        val questsToDisplay = sortedQuests.subList(startIndex, endIndex)
+        val endIndex = (startIndex + maxQuestsPerPage).coerceAtMost(sortedViews.size)
+        val questsToDisplay = sortedViews.subList(startIndex, endIndex)
 
-        for ((quest, slot) in questsToDisplay.zip(questSlots)) {
+        for ((view, slot) in questsToDisplay.zip(questSlots)) {
+            val quest = view.quest
             val ref = quest.ref()
-            val status = quest.questStatus(player)
+            val status = view.status
+            val displayOverride = category.questDisplays[quest.id]?.state(status)
             val objectives: List<ObjectiveEntry> = player.questShowingObjectives(ref).toList()
             val description = quest.children.descendants(LinesEntry::class).mapNotNull { it.get() }
 
@@ -133,10 +144,17 @@ class QuestCategoryInventory(
             }
             
             // Build status-specific lore
+            val customLore = displayOverride?.lore ?: emptyList()
             val statusLore = when (status) {
-                QuestStatus.COMPLETED -> menuConfig.questButtons.completed.lore
+                QuestStatus.COMPLETED -> {
+                    val loreLines = mutableListOf<String>()
+                    loreLines.addAll(customLore)
+                    loreLines.addAll(menuConfig.questButtons.completed.lore)
+                    loreLines
+                }
                 QuestStatus.INACTIVE -> {
                     val loreLines = mutableListOf<String>()
+                    loreLines.addAll(customLore)
                     loreLines.addAll(menuConfig.questButtons.notStarted.lore)
                     category.restrictions[quest.id]?.let { extra ->
                         if (extra.isNotEmpty()) {
@@ -148,12 +166,13 @@ class QuestCategoryInventory(
                 }
                 QuestStatus.ACTIVE -> {
                     val loreLines = mutableListOf<String>()
-                    if (objectives.isNotEmpty()) {
+                    if (!displayOverride?.hideObjectives.isTrue() && objectives.isNotEmpty()) {
                         if (descriptionLore.isEmpty()) {
                             loreLines.add("")
                         }
                         loreLines.addAll(objectives.map { it.display(player) })
                     }
+                    loreLines.addAll(customLore)
                     loreLines.addAll(menuConfig.questButtons.inProgress.lore)
                     if (player isQuestTracked ref) {
                         loreLines.addAll(menuConfig.questButtons.untrackLore)
@@ -187,7 +206,11 @@ class QuestCategoryInventory(
             val baseStack: ItemStack = overrideItem?.build(player) ?: template.baseItem(player, Material.BARRIER)
             val questButton = baseStack.apply {
                 itemMeta = itemMeta.apply {
-                    displayName(quest.displayName.get(player).parsePlaceholders(player).asMiniWithoutItalic())
+                    val nameComponent = displayOverride?.name?.takeIf { it.isNotBlank() }
+                        ?.parsePlaceholders(player)
+                        ?.asMiniWithoutItalic()
+                        ?: quest.displayName.get(player).parsePlaceholders(player).asMiniWithoutItalic()
+                    displayName(nameComponent)
                     lore(lore)
                 }
             }
@@ -218,7 +241,13 @@ class QuestCategoryInventory(
             inventory.setItem(nextSlot, menuConfig.buttons.next.toItemTemplate().buildItem(player, Material.BARRIER))
         }
 
+        val sortTemplate = menuConfig.buttons.sort
         val sortLore = mutableListOf<Component>()
+        if (sortTemplate.lore.isNotEmpty()) {
+            sortTemplate.lore.flatMap { it.split("\n") }
+                .map { it.parsePlaceholders(player).asMiniWithoutItalic() }
+                .forEach { sortLore.add(it) }
+        }
         sortLore.add("".asMiniWithoutItalic())
         listOf(
             SortOption.ALL to menuConfig.buttons.sort.allName,
@@ -232,7 +261,6 @@ class QuestCategoryInventory(
                 .parsePlaceholders(player).asMiniWithoutItalic()
         }.forEach { sortLore.add(it) }
 
-        val sortTemplate = menuConfig.buttons.sort
         val sortButton = sortTemplate.toItemTemplate().buildItem(
             player,
             Material.BARRIER,
@@ -265,3 +293,7 @@ private fun defaultQuestSlots(rows: Int, questsPerRow: Int): List<Int> {
         }
     }
 }
+
+private data class QuestView(val quest: QuestEntry, val status: QuestStatus)
+
+private fun Boolean?.isTrue(): Boolean = this == true

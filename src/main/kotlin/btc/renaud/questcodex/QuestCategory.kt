@@ -52,12 +52,18 @@ data class QuestCategory(
     val questOrders: MutableMap<String, Int> = mutableMapOf(),
     /** Optional quest item overrides per quest and status. */
     val questItems: MutableMap<String, QuestItemOverrides> = mutableMapOf(),
+    /** Optional quest display overrides per quest and status. */
+    val questDisplays: MutableMap<String, QuestDisplayOverrides> = mutableMapOf(),
     /** Optional restriction messages for quests in this category. */
     val restrictions: MutableMap<String, List<String>> = mutableMapOf(),
     /** Parent category if this category is a sub-category. */
     var parent: QuestCategory? = null,
     /** Child categories registered under this category. */
     val subCategories: MutableList<QuestCategory> = mutableListOf(),
+    /** Optional per-category quest count lore override. */
+    var categoryLoreQuestCountOverride: List<String>? = null,
+    /** Optional per-category lore override. */
+    var categoryLoreOverride: List<String>? = null,
 )
 
 data class QuestItemOverrides(
@@ -79,6 +85,44 @@ data class QuestItemOverrides(
         inProgress = if (other.inProgress != Item.Empty) other.inProgress else inProgress,
         completed = if (other.completed != Item.Empty) other.completed else completed,
     )
+}
+
+data class QuestStateDisplayOverride(
+    val name: String = "",
+    val lore: List<String> = emptyList(),
+    val hideObjectives: Boolean = false,
+    val hideQuest: Boolean = false,
+) {
+    fun hasOverrides(): Boolean =
+        name.isNotBlank() || lore.isNotEmpty() || hideObjectives || hideQuest
+
+    fun overrideWith(other: QuestStateDisplayOverride): QuestStateDisplayOverride = QuestStateDisplayOverride(
+        name = if (other.name.isNotBlank()) other.name else name,
+        lore = if (other.lore.isNotEmpty()) other.lore else lore,
+        hideObjectives = hideObjectives || other.hideObjectives,
+        hideQuest = hideQuest || other.hideQuest,
+    )
+}
+
+data class QuestDisplayOverrides(
+    val notStarted: QuestStateDisplayOverride = QuestStateDisplayOverride(),
+    val inProgress: QuestStateDisplayOverride = QuestStateDisplayOverride(),
+    val completed: QuestStateDisplayOverride = QuestStateDisplayOverride(),
+) {
+    fun hasOverrides(): Boolean =
+        notStarted.hasOverrides() || inProgress.hasOverrides() || completed.hasOverrides()
+
+    fun overrideWith(other: QuestDisplayOverrides): QuestDisplayOverrides = QuestDisplayOverrides(
+        notStarted = notStarted.overrideWith(other.notStarted),
+        inProgress = inProgress.overrideWith(other.inProgress),
+        completed = completed.overrideWith(other.completed),
+    )
+
+    fun state(status: QuestStatus): QuestStateDisplayOverride = when (status) {
+        QuestStatus.INACTIVE -> notStarted
+        QuestStatus.ACTIVE -> inProgress
+        QuestStatus.COMPLETED -> completed
+    }
 }
 
 /**
@@ -109,6 +153,8 @@ object QuestCategoryRegistry {
         hideLockedQuests: Boolean = false,
         hideWhenLocked: Boolean = false,
         iconName: String = "",
+        categoryLoreQuestCount: List<String>? = null,
+        categoryLore: List<String>? = null,
     ): QuestCategory {
         val key = name.lowercase()
         val category = categories.getOrPut(key) { QuestCategory(name) }
@@ -142,6 +188,8 @@ object QuestCategoryRegistry {
         category.completedMessage = completedMessage
         category.hideLockedQuests = hideLockedQuests
         category.hideWhenLocked = hideWhenLocked
+        category.categoryLoreQuestCountOverride = categoryLoreQuestCount
+        category.categoryLoreOverride = categoryLore
         return category
     }
 
@@ -164,6 +212,7 @@ object QuestCategoryRegistry {
         quest: QuestEntry,
         order: Int? = null,
         overrides: QuestItemOverrides? = null,
+        displayOverrides: QuestDisplayOverrides? = null,
     ) {
         val category = ensure(categoryName)
         if (!category.quests.contains(questRef)) {
@@ -183,6 +232,16 @@ object QuestCategoryRegistry {
                 )
             }
             category.questItems[quest.id] = merged
+        }
+        displayOverrides?.takeIf { it.hasOverrides() }?.let { newOverrides ->
+            val existingOverrides = category.questDisplays[quest.id]
+            val merged = existingOverrides?.overrideWith(newOverrides) ?: newOverrides
+            if (existingOverrides != null && merged != existingOverrides) {
+                plugin.logger.fine(
+                    "[QuestCodex] Updating quest display overrides for quest ${quest.id} in category ${category.name}."
+                )
+            }
+            category.questDisplays[quest.id] = merged
         }
     }
 

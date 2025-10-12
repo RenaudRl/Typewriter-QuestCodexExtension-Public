@@ -46,45 +46,97 @@ object QuestCodexInitializer : Initializable {
                 questSlots = parseQuestSlots(it.questSlots, it.category),
                 activeCriteria = it.activeCriteria,
                 completedCriteria = it.completedCriteria,
-                blockedMessage = it.blockedMessage.replace("\r", "").split("\n"),
-                activeMessage = it.activeMessage.replace("\r", "").split("\n"),
-                completedMessage = it.completedMessage.replace("\r", "").split("\n"),
+                blockedMessage = parseLines(it.blockedMessage),
+                activeMessage = parseLines(it.activeMessage),
+                completedMessage = parseLines(it.completedMessage),
                 hideLockedQuests = it.hideLockedQuests,
                 hideWhenLocked = it.hideWhenLocked,
                 iconName = it.iconName,
+                categoryLoreQuestCount = parseOptionalLore(it.categoryLoreQuestCount),
+                categoryLore = parseOptionalLore(it.categoryLore),
             )
         }
 
         // Assign quests to their categories based on the quest references
         Query.find<QuestCategoryEntry>().forEach { entry ->
-            val overrides = QuestItemOverrides(
+            val defaultItemOverrides = QuestItemOverrides(
                 notStarted = entry.notStartedItem,
                 inProgress = entry.inProgressItem,
                 completed = entry.completedItem,
-            )
+            ).takeIf { it.hasOverrides() }
+            val defaultDisplayOverrides = QuestDisplayOverrides(
+                notStarted = QuestStateDisplayOverride(
+                    name = entry.notStartedName,
+                    lore = parseLines(entry.notStartedLore),
+                    hideQuest = entry.hideWhenNotStarted,
+                ),
+                inProgress = QuestStateDisplayOverride(
+                    name = entry.inProgressName,
+                    lore = parseLines(entry.inProgressLore),
+                    hideQuest = entry.hideWhenInProgress,
+                    hideObjectives = entry.hideObjectivesWhenInProgress,
+                ),
+                completed = QuestStateDisplayOverride(
+                    name = entry.completedName,
+                    lore = parseLines(entry.completedLore),
+                    hideQuest = entry.hideWhenCompleted,
+                    hideObjectives = entry.hideObjectivesWhenCompleted,
+                ),
+            ).takeIf { it.hasOverrides() }
             if (entry.questOrders.size > entry.questRefs.size) {
                 plugin.logger.warning(
                     "[QuestCodex] Quest category '${entry.category}' defines more quest orders than quest refs; extra orders will be ignored."
                 )
             }
+            val questOverrideMap = buildQuestOverrideMap(entry)
+            val unusedOverrides = questOverrideMap.keys.toMutableSet()
             entry.questRefs.forEachIndexed { index, ref ->
+                val questId = ref.id
+                val questOverride = questOverrideMap[questId]
+                if (questOverride != null) {
+                    unusedOverrides -= questId
+                }
                 val quest = ref.get()
                 if (quest != null) {
                     val order = entry.questOrders.getOrNull(index)?.takeIf { it != 0 }
+                    val questItemOverrides = questOverride?.toItemOverrides()?.takeIf { it.hasOverrides() }
+                    val questDisplayOverrides = questOverride?.toDisplayOverrides()?.takeIf { it.hasOverrides() }
+                    val mergedItemOverrides = when {
+                        defaultItemOverrides != null && questItemOverrides != null ->
+                            defaultItemOverrides.overrideWith(questItemOverrides)
+                        questItemOverrides != null -> questItemOverrides
+                        else -> defaultItemOverrides
+                    }
+                    val mergedDisplayOverrides = when {
+                        defaultDisplayOverrides != null && questDisplayOverrides != null ->
+                            defaultDisplayOverrides.overrideWith(questDisplayOverrides)
+                        questDisplayOverrides != null -> questDisplayOverrides
+                        else -> defaultDisplayOverrides
+                    }
                     QuestCategoryRegistry.addQuest(
                         entry.category,
                         ref,
                         quest,
                         order,
-                        overrides.takeIf { it.hasOverrides() },
+                        mergedItemOverrides,
+                        mergedDisplayOverrides,
+                    )
+                } else if (questOverride != null) {
+                    plugin.logger.warning(
+                        "[QuestCodex] Quest category '${entry.category}' defines overrides for quest $questId, but the quest could not be resolved."
                     )
                 }
+            }
+            if (unusedOverrides.isNotEmpty()) {
+                plugin.logger.warning(
+                    "[QuestCodex] Quest category '${entry.category}' defines overrides for quests ${unusedOverrides.joinToString()} that are not part of quest_refs. The overrides were ignored."
+                )
             }
         }
 
         // Register restriction messages for quests
         Query.find<QuestCategoryRestrictionEntry>().forEach { entry ->
-            val lines = entry.message.replace("\r", "").split("\n")
+            val lines = parseLines(entry.message)
             entry.questRefs.forEach { ref ->
                 if (ref.get() != null) {
                     QuestCategoryRegistry.setRestriction(entry.category, ref, lines)
@@ -113,14 +165,9 @@ object QuestCodexInitializer : Initializable {
     }
 
     private fun runSynchronously(action: () -> Unit) {
-        val future = Bukkit.getScheduler().callSyncMethod(plugin) {
-            action()
-            null
-        }
         try {
-            future.get()
-        } catch (throwable: Exception) {
-            future.cancel(true)
+            FoliaScheduler.runSync(action)
+        } catch (throwable: Throwable) {
             plugin.logger.log(Level.SEVERE, "[QuestCodex] Failed to execute shutdown action", throwable)
             action()
         }
@@ -161,4 +208,66 @@ private fun parseQuestSlots(rawSlots: List<String>, category: String): List<Int>
         }
     }
     return resolved.toList()
+}
+
+private fun parseLines(raw: String): List<String> {
+    val sanitized = raw.replace("\r", "")
+    if (sanitized.isBlank()) return emptyList()
+    return sanitized.split("\n")
+}
+
+private fun parseOptionalLore(raw: String): List<String>? {
+    val sanitized = raw.replace("\r", "")
+    if (sanitized.isEmpty()) return null
+    val trimmed = sanitized.trim()
+    if (trimmed.isEmpty()) return null
+    if (trimmed == "-") return emptyList()
+    return sanitized.split("\n")
+}
+
+private fun QuestCategoryQuestOverride.toItemOverrides(): QuestItemOverrides = QuestItemOverrides(
+    notStarted = notStartedItem,
+    inProgress = inProgressItem,
+    completed = completedItem,
+)
+
+private fun QuestCategoryQuestOverride.toDisplayOverrides(): QuestDisplayOverrides = QuestDisplayOverrides(
+    notStarted = QuestStateDisplayOverride(
+        name = notStartedName,
+        lore = parseLines(notStartedLore),
+        hideQuest = hideWhenNotStarted,
+    ),
+    inProgress = QuestStateDisplayOverride(
+        name = inProgressName,
+        lore = parseLines(inProgressLore),
+        hideQuest = hideWhenInProgress,
+        hideObjectives = hideObjectivesWhenInProgress,
+    ),
+    completed = QuestStateDisplayOverride(
+        name = completedName,
+        lore = parseLines(completedLore),
+        hideQuest = hideWhenCompleted,
+        hideObjectives = hideObjectivesWhenCompleted,
+    ),
+)
+
+private fun buildQuestOverrideMap(entry: QuestCategoryEntry): Map<String, QuestCategoryQuestOverride> {
+    if (entry.questOverrides.isEmpty()) return emptyMap()
+    val overridesByQuest = mutableMapOf<String, QuestCategoryQuestOverride>()
+    entry.questOverrides.forEach { override ->
+        val questId = override.quest.id
+        if (questId.isBlank()) {
+            plugin.logger.warning(
+                "[QuestCodex] Quest category '${entry.category}' defines an override without a quest reference; the override will be ignored."
+            )
+            return@forEach
+        }
+        val previous = overridesByQuest.put(questId, override)
+        if (previous != null) {
+            plugin.logger.warning(
+                "[QuestCodex] Quest category '${entry.category}' defines multiple overrides for quest $questId; the last override will be used."
+            )
+        }
+    }
+    return overridesByQuest
 }

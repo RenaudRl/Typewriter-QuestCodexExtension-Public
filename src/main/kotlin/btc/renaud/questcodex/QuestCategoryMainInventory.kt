@@ -49,6 +49,8 @@ class QuestCategoryMainInventory(
     private val nextSlot: Int = menuConfig.nextButton.resolveSlot(rows, size)
     private val infoSlot: Int = menuConfig.infoButton.resolveSlot(rows, size)
     private val backSlot: Int = menuConfig.backButton?.resolveSlot(rows, size) ?: -1
+    private val configuredBackCommands: List<String> = menuConfig.backButtonCommands
+    private val hasBackCommand: Boolean = configuredBackCommands.any { it.isNotBlank() }
     private val placementMap: Map<Int, List<CategoryPlacement>>
     private val maxPageIndex: Int
 
@@ -131,7 +133,9 @@ class QuestCategoryMainInventory(
             inventory.setItem(nextSlot, menuConfig.nextButton.toItemTemplate().buildItem(player, Material.ARROW))
         }
         inventory.setItem(infoSlot, menuConfig.infoButton.toItemTemplate().buildItem(player, Material.PAPER))
-        if (parent != null && menuConfig.backButton != null && backSlot in 0 until size) {
+        val shouldDisplayBackButton =
+            menuConfig.backButton != null && backSlot in 0 until size && (parent != null || hasBackCommand)
+        if (shouldDisplayBackButton) {
             inventory.setItem(backSlot, menuConfig.backButton.toItemTemplate().buildItem(player, Material.BARRIER))
         }
     }
@@ -160,13 +164,16 @@ class QuestCategoryMainInventory(
                 val status = category.categoryStatus(player)
 
                 val loreLines = mutableListOf<String>()
-                menuConfig.categoryLoreQuestCount.forEach { template ->
+                val questCountTemplates = category.categoryLoreQuestCountOverride
+                    ?: menuConfig.categoryLoreQuestCount
+                questCountTemplates.forEach { template ->
                     loreLines += template
                         .replace("<completed>", completed.toString())
                         .replace("<total>", total.toString())
                 }
                 if (status != CategoryStatus.BLOCKED) {
-                    menuConfig.categoryLore.forEach { loreLines += it }
+                    val baseLoreTemplates = category.categoryLoreOverride ?: menuConfig.categoryLore
+                    baseLoreTemplates.forEach { loreLines += it }
                 }
                 when (status) {
                     CategoryStatus.BLOCKED -> loreLines += category.blockedMessage
@@ -190,6 +197,7 @@ class QuestCategoryMainInventory(
     fun infoSlot(): Int = infoSlot
     fun backSlot(): Int = backSlot
     fun parent(): QuestCategory? = parent
+    fun backCommands(): List<String> = configuredBackCommands
 
     private data class CategoryPlacement(val page: Int, val slot: Int, val category: QuestCategory)
 }

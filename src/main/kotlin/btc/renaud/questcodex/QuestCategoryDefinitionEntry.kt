@@ -70,4 +70,14 @@ class QuestCategoryDefinitionEntry(
     @Colored
     @MultiLine
     val completedMessage: String = "",
+    @Help("Override quest count lore for this category. Use '-' to remove it entirely.")
+    @Placeholder
+    @Colored
+    @MultiLine
+    val categoryLoreQuestCount: String = "",
+    @Help("Override the base lore for this category when it can be opened. Use '-' to remove it entirely.")
+    @Placeholder
+    @Colored
+    @MultiLine
+    val categoryLore: String = "",
 ) : ManifestEntry

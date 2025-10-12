@@ -1,6 +1,8 @@
 package btc.renaud.questcodex
 
 import com.typewritermc.core.entries.ref
+import com.typewritermc.engine.paper.extensions.placeholderapi.parsePlaceholders
+import com.typewritermc.engine.paper.plugin
 import com.typewritermc.quest.QuestStatus
 import com.typewritermc.quest.isQuestTracked
 import com.typewritermc.quest.trackQuest
@@ -11,6 +13,7 @@ import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryAction
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryDragEvent
+import java.util.logging.Level
 
 /** Handles interactions with quest category inventories. */
 class QuestCategoryListener : Listener {
@@ -114,6 +117,26 @@ class QuestCategoryListener : Listener {
                         }
                     }
                     holder.backSlot() -> {
+                        val commands = holder.backCommands()
+                            .mapNotNull { it.trim().takeIf(String::isNotEmpty) }
+                        if (commands.isNotEmpty()) {
+                            player.closeInventory()
+                            commands.forEach { rawCommand ->
+                                val parsed = rawCommand.parsePlaceholders(player)
+                                val normalized = parsed.removePrefix("/").trim()
+                                if (normalized.isEmpty()) return@forEach
+                                val executed = player.performCommand(normalized)
+                                if (!executed) {
+                                    plugin.logger.log(
+                                        Level.WARNING,
+                                        "[QuestCodex] Failed to execute back button command '$normalized' for player ${player.name}."
+                                    )
+                                }
+                            }
+                            player.playCodexSound(codexSoundButtonBack)
+                            player.playCodexSound(codexSoundMenuSwitch)
+                            return
+                        }
                         val parent = holder.parent()
                         player.openInventory(QuestCategoryMainInventory(player, parent?.parent).getInventory())
                         player.playCodexSound(codexSoundButtonBack)

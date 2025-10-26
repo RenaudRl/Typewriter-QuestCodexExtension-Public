@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "btc.renaud"
-version = "0.0.9"
+version = "0.1.1"
 
 typewriter {
     namespace = "renaud"
@@ -24,7 +24,7 @@ typewriter {
             |A quest codex for Typewriter that allows players to view and manage their quests
             |Multiples menus, organized by status and tracking progress with quest categories.
             """.trimMargin()
-        engineVersion = "0.9.0-beta-166"
+        engineVersion = "0.9.0-beta-167"
         channel = com.typewritermc.moduleplugin.ReleaseChannel.BETA
 
         dependencies {

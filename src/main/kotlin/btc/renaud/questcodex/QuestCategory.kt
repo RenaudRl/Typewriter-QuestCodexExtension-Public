@@ -287,3 +287,4 @@ fun QuestCategory.categoryStatus(player: Player): CategoryStatus = when {
     activeCriteria.matches(player) -> CategoryStatus.IN_PROGRESS
     else -> CategoryStatus.BLOCKED
 }
+

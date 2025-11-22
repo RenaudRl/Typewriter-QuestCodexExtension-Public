@@ -21,3 +21,4 @@ val codexSoundButtonQuestTrack: Sound
     get() = QuestCodexConfig.sounds.questTrack
 val codexSoundButtonQuestUntrack: Sound
     get() = QuestCodexConfig.sounds.questUntrack
+

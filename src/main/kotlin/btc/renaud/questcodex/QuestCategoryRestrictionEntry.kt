@@ -33,3 +33,4 @@ class QuestCategoryRestrictionEntry(
     @MultiLine
     val message: String = "",
 ) : ManifestEntry
+

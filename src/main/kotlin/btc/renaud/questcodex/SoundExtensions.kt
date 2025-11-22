@@ -12,3 +12,4 @@ fun Player.playCodexSound(sound: Sound) {
 }
 
 fun Sound.isConfigured(): Boolean = soundId.namespacedKey != null
+

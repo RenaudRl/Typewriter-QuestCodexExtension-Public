@@ -134,3 +134,4 @@ data class QuestCategoryQuestOverride(
     @Help("Hide quest objectives once the quest is completed")
     val hideObjectivesWhenCompleted: Boolean = false,
 )
+

@@ -64,3 +64,4 @@ class QuestEntryArgumentType(
     private fun questNotFound(nativeType: String) =
         SimpleCommandExceptionType(LiteralMessage("Could not find quest $nativeType")).create()
 }
+

@@ -81,3 +81,4 @@ class QuestCategoryDefinitionEntry(
     @MultiLine
     val categoryLore: String = "",
 ) : ManifestEntry
+

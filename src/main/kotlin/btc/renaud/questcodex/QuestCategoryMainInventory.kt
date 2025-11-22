@@ -201,3 +201,4 @@ class QuestCategoryMainInventory(
 
     private data class CategoryPlacement(val page: Int, val slot: Int, val category: QuestCategory)
 }
+

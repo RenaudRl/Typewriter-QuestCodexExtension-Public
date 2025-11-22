@@ -243,22 +243,33 @@ class QuestCategoryInventory(
 
         val sortTemplate = menuConfig.buttons.sort
         val sortLore = mutableListOf<Component>()
-        if (sortTemplate.lore.isNotEmpty()) {
-            sortTemplate.lore.flatMap { it.split("\n") }
-                .map { it.parsePlaceholders(player).asMiniWithoutItalic() }
-                .forEach { sortLore.add(it) }
+        // Keep any custom lore configured for the button
+        sortTemplate.lore.flatMap { it.split("\n") }
+            .map { it.parsePlaceholders(player).asMiniWithoutItalic() }
+            .forEach { sortLore.add(it) }
+        // Separate custom lore from the dynamic sort options
+        if (sortLore.isNotEmpty()) {
+            sortLore.add("".asMiniWithoutItalic())
         }
-        sortLore.add("".asMiniWithoutItalic())
         listOf(
             SortOption.ALL to menuConfig.buttons.sort.allName,
             SortOption.COMPLETED to menuConfig.buttons.sort.completedName,
             SortOption.IN_PROGRESS to menuConfig.buttons.sort.inProgressName,
             SortOption.NOT_STARTED to menuConfig.buttons.sort.notStartedName
         ).map { (option, name) ->
-            val prefix = if (sort == option) menuConfig.buttons.sort.selectedPrefix else ""
-            val format = if (sort == option) menuConfig.buttons.sort.selectedFormat else menuConfig.buttons.sort.unselectedFormat
-            format.replace("{prefix}", prefix).replace("{name}", name)
-                .parsePlaceholders(player).asMiniWithoutItalic()
+            val sortSettings = menuConfig.buttons.sort
+            val selected = sort == option
+            val rawFormat = if (selected) sortSettings.selectedFormat else sortSettings.unselectedFormat
+            val formatWithName = if (rawFormat.contains("{name}")) rawFormat else "$rawFormat{name}"
+            val formatWithPrefix = if (selected && !formatWithName.contains("{prefix}")) {
+                "{prefix}$formatWithName"
+            } else {
+                formatWithName
+            }
+            val resolved = formatWithPrefix
+                .replace("{prefix}", if (selected) sortSettings.selectedPrefix else "")
+                .replace("{name}", name)
+            resolved.parsePlaceholders(player).asMiniWithoutItalic()
         }.forEach { sortLore.add(it) }
 
         val sortButton = sortTemplate.toItemTemplate().buildItem(
@@ -297,3 +308,4 @@ private fun defaultQuestSlots(rows: Int, questsPerRow: Int): List<Int> {
 private data class QuestView(val quest: QuestEntry, val status: QuestStatus)
 
 private fun Boolean?.isTrue(): Boolean = this == true
+

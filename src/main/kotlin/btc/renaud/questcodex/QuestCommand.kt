@@ -40,3 +40,4 @@ fun CommandTree.questCommand() = literal("quest") {
         }
     }
 }
+

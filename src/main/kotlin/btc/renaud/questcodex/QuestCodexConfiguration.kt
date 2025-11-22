@@ -389,3 +389,4 @@ fun ItemTemplate.buildItem(
 private fun materialItem(material: Material): Item = ItemStack(material).toItem()
 
 private fun defaultSound(id: String): Sound = Sound(DefaultSoundId(id))
+

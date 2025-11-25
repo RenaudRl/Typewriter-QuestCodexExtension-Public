@@ -72,6 +72,11 @@ class QuestCategoryEntry(
     @Colored
     @MultiLine
     val completedLore: String = "",
+    @Help("Custom lore appended at the bottom of the quest button for each referenced quest. Align entries with questRefs.")
+    @Placeholder
+    @Colored
+    @MultiLine
+    val questAdditionalLore: List<String> = emptyList(),
     @Help("Hide this quest from the menu while it is not started")
     val hideWhenNotStarted: Boolean = false,
     @Help("Hide this quest from the menu while it is in progress")
@@ -123,6 +128,11 @@ data class QuestCategoryQuestOverride(
     @Colored
     @MultiLine
     val completedLore: String = "",
+    @Help("Custom lore appended at the bottom of the quest button for this quest")
+    @Placeholder
+    @Colored
+    @MultiLine
+    val additionalLore: String = "",
     @Help("Hide this quest from the menu while it is not started")
     val hideWhenNotStarted: Boolean = false,
     @Help("Hide this quest from the menu while it is in progress")

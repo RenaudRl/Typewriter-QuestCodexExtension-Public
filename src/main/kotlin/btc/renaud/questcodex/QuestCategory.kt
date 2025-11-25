@@ -54,6 +54,8 @@ data class QuestCategory(
     val questItems: MutableMap<String, QuestItemOverrides> = mutableMapOf(),
     /** Optional quest display overrides per quest and status. */
     val questDisplays: MutableMap<String, QuestDisplayOverrides> = mutableMapOf(),
+    /** Optional extra lore appended after the quest's main lore for each quest. */
+    val questAdditionalLore: MutableMap<String, List<String>> = mutableMapOf(),
     /** Optional restriction messages for quests in this category. */
     val restrictions: MutableMap<String, List<String>> = mutableMapOf(),
     /** Parent category if this category is a sub-category. */
@@ -213,6 +215,7 @@ object QuestCategoryRegistry {
         order: Int? = null,
         overrides: QuestItemOverrides? = null,
         displayOverrides: QuestDisplayOverrides? = null,
+        additionalLore: List<String>? = null,
     ) {
         val category = ensure(categoryName)
         if (!category.quests.contains(questRef)) {
@@ -242,6 +245,9 @@ object QuestCategoryRegistry {
                 )
             }
             category.questDisplays[quest.id] = merged
+        }
+        if (additionalLore != null) {
+            category.questAdditionalLore[quest.id] = additionalLore
         }
     }
 

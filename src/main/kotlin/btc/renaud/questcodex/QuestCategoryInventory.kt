@@ -183,7 +183,15 @@ class QuestCategoryInventory(
                 }
             }.flatMap { it.split("\n") }
 
-            val rawLoreLines = descriptionLore + statusLore
+            val additionalLore = category.questAdditionalLore[quest.id].orEmpty()
+            val rawLoreLines = buildList {
+                addAll(descriptionLore)
+                addAll(statusLore)
+                if (additionalLore.isNotEmpty() && (descriptionLore.isNotEmpty() || statusLore.isNotEmpty())) {
+                    add("")
+                }
+                addAll(additionalLore)
+            }
 
             val lore = mutableListOf<net.kyori.adventure.text.Component>()
             for (line in rawLoreLines) {

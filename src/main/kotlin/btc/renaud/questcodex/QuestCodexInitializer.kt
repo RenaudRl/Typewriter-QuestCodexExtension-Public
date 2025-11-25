@@ -83,6 +83,7 @@ object QuestCodexInitializer : Initializable {
                     hideObjectives = entry.hideObjectivesWhenCompleted,
                 ),
             ).takeIf { it.hasOverrides() }
+            val defaultAdditionalLore = entry.questAdditionalLore.map { parseLines(it) }
             if (entry.questOrders.size > entry.questRefs.size) {
                 plugin.logger.warning(
                     "[QuestCodex] Quest category '${entry.category}' defines more quest orders than quest refs; extra orders will be ignored."
@@ -101,6 +102,12 @@ object QuestCodexInitializer : Initializable {
                     val order = entry.questOrders.getOrNull(index)?.takeIf { it != 0 }
                     val questItemOverrides = questOverride?.toItemOverrides()?.takeIf { it.hasOverrides() }
                     val questDisplayOverrides = questOverride?.toDisplayOverrides()?.takeIf { it.hasOverrides() }
+                    val questAdditionalLore = questOverride?.additionalLoreLines().orEmpty()
+                    val defaultAdditionalLoreForQuest = defaultAdditionalLore.getOrNull(index).orEmpty()
+                    val mergedAdditionalLore = when {
+                        questAdditionalLore.isNotEmpty() -> questAdditionalLore
+                        else -> defaultAdditionalLoreForQuest
+                    }
                     val mergedItemOverrides = when {
                         defaultItemOverrides != null && questItemOverrides != null ->
                             defaultItemOverrides.overrideWith(questItemOverrides)
@@ -120,6 +127,7 @@ object QuestCodexInitializer : Initializable {
                         order,
                         mergedItemOverrides,
                         mergedDisplayOverrides,
+                        mergedAdditionalLore.takeIf { it.isNotEmpty() },
                     )
                 } else if (questOverride != null) {
                     plugin.logger.warning(
@@ -250,6 +258,8 @@ private fun QuestCategoryQuestOverride.toDisplayOverrides(): QuestDisplayOverrid
         hideObjectives = hideObjectivesWhenCompleted,
     ),
 )
+
+private fun QuestCategoryQuestOverride.additionalLoreLines(): List<String> = parseLines(additionalLore)
 
 private fun buildQuestOverrideMap(entry: QuestCategoryEntry): Map<String, QuestCategoryQuestOverride> {
     if (entry.questOverrides.isEmpty()) return emptyMap()

@@ -14,11 +14,6 @@ import com.typewritermc.engine.paper.entry.ManifestEntry
 import com.typewritermc.engine.paper.utils.item.Item
 import com.typewritermc.quest.QuestEntry
 
-/**
- * Typewriter entry used to link a quest to a specific category. When the
- * extension starts all these entries are scanned and the quests are registered
- * with the [QuestCategoryRegistry].
- */
 @Entry(
     "quest_category",
     "Adds quests to a quest codex category",
@@ -72,11 +67,6 @@ class QuestCategoryEntry(
     @Colored
     @MultiLine
     val completedLore: String = "",
-    @Help("Custom lore appended at the bottom of the quest button for each referenced quest. Align entries with questRefs.")
-    @Placeholder
-    @Colored
-    @MultiLine
-    val questAdditionalLore: List<String> = emptyList(),
     @Help("Hide this quest from the menu while it is not started")
     val hideWhenNotStarted: Boolean = false,
     @Help("Hide this quest from the menu while it is in progress")
@@ -128,11 +118,21 @@ data class QuestCategoryQuestOverride(
     @Colored
     @MultiLine
     val completedLore: String = "",
-    @Help("Custom lore appended at the bottom of the quest button for this quest")
+    @Help("Lore additionnel affiche en bas du bouton quand le statut est Not Started (override)")
     @Placeholder
     @Colored
     @MultiLine
-    val additionalLore: String = "",
+    val additionalLoreNotStarted: String = "",
+    @Help("Lore additionnel affiche en bas du bouton quand le statut est In Progress (override)")
+    @Placeholder
+    @Colored
+    @MultiLine
+    val additionalLoreInProgress: String = "",
+    @Help("Lore additionnel affiche en bas du bouton quand le statut est Completed (override)")
+    @Placeholder
+    @Colored
+    @MultiLine
+    val additionalLoreCompleted: String = "",
     @Help("Hide this quest from the menu while it is not started")
     val hideWhenNotStarted: Boolean = false,
     @Help("Hide this quest from the menu while it is in progress")
@@ -144,4 +144,3 @@ data class QuestCategoryQuestOverride(
     @Help("Hide quest objectives once the quest is completed")
     val hideObjectivesWhenCompleted: Boolean = false,
 )
-

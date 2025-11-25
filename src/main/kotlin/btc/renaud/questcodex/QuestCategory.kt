@@ -54,8 +54,8 @@ data class QuestCategory(
     val questItems: MutableMap<String, QuestItemOverrides> = mutableMapOf(),
     /** Optional quest display overrides per quest and status. */
     val questDisplays: MutableMap<String, QuestDisplayOverrides> = mutableMapOf(),
-    /** Optional extra lore appended after the quest's main lore for each quest. */
-    val questAdditionalLore: MutableMap<String, List<String>> = mutableMapOf(),
+    /** Optional extra lore appended after the quest's main lore for each quest, per status. */
+    val questAdditionalLore: MutableMap<String, QuestAdditionalLore> = mutableMapOf(),
     /** Optional restriction messages for quests in this category. */
     val restrictions: MutableMap<String, List<String>> = mutableMapOf(),
     /** Parent category if this category is a sub-category. */
@@ -121,6 +121,27 @@ data class QuestDisplayOverrides(
     )
 
     fun state(status: QuestStatus): QuestStateDisplayOverride = when (status) {
+        QuestStatus.INACTIVE -> notStarted
+        QuestStatus.ACTIVE -> inProgress
+        QuestStatus.COMPLETED -> completed
+    }
+}
+
+data class QuestAdditionalLore(
+    val notStarted: List<String> = emptyList(),
+    val inProgress: List<String> = emptyList(),
+    val completed: List<String> = emptyList(),
+) {
+    fun hasContent(): Boolean =
+        notStarted.isNotEmpty() || inProgress.isNotEmpty() || completed.isNotEmpty()
+
+    fun overrideWith(other: QuestAdditionalLore): QuestAdditionalLore = QuestAdditionalLore(
+        notStarted = if (other.notStarted.isNotEmpty()) other.notStarted else notStarted,
+        inProgress = if (other.inProgress.isNotEmpty()) other.inProgress else inProgress,
+        completed = if (other.completed.isNotEmpty()) other.completed else completed,
+    )
+
+    fun forStatus(status: QuestStatus): List<String> = when (status) {
         QuestStatus.INACTIVE -> notStarted
         QuestStatus.ACTIVE -> inProgress
         QuestStatus.COMPLETED -> completed
@@ -215,7 +236,7 @@ object QuestCategoryRegistry {
         order: Int? = null,
         overrides: QuestItemOverrides? = null,
         displayOverrides: QuestDisplayOverrides? = null,
-        additionalLore: List<String>? = null,
+        additionalLore: QuestAdditionalLore? = null,
     ) {
         val category = ensure(categoryName)
         if (!category.quests.contains(questRef)) {
@@ -246,7 +267,7 @@ object QuestCategoryRegistry {
             }
             category.questDisplays[quest.id] = merged
         }
-        if (additionalLore != null) {
+        if (additionalLore != null && additionalLore.hasContent()) {
             category.questAdditionalLore[quest.id] = additionalLore
         }
     }

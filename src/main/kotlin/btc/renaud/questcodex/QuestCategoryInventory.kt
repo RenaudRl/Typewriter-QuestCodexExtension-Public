@@ -183,7 +183,7 @@ class QuestCategoryInventory(
                 }
             }.flatMap { it.split("\n") }
 
-            val additionalLore = category.questAdditionalLore[quest.id].orEmpty()
+            val additionalLore = category.questAdditionalLore[quest.id]?.forStatus(status).orEmpty()
             val rawLoreLines = buildList {
                 addAll(descriptionLore)
                 addAll(statusLore)

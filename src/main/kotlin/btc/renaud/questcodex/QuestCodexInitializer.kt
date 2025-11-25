@@ -57,6 +57,17 @@ object QuestCodexInitializer : Initializable {
             )
         }
 
+        // Load per-quest additional lore entries (global, status-based)
+        val additionalLoreByQuestId: Map<String, QuestAdditionalLore> = Query.find<QuestAdditionalLoreEntry>()
+            .associate { entry ->
+                val questId = entry.quest.id
+                questId to QuestAdditionalLore(
+                    notStarted = parseLines(entry.additionalLoreNotStarted),
+                    inProgress = parseLines(entry.additionalLoreInProgress),
+                    completed = parseLines(entry.additionalLoreCompleted),
+                )
+            }
+
         // Assign quests to their categories based on the quest references
         Query.find<QuestCategoryEntry>().forEach { entry ->
             val defaultItemOverrides = QuestItemOverrides(
@@ -83,7 +94,6 @@ object QuestCodexInitializer : Initializable {
                     hideObjectives = entry.hideObjectivesWhenCompleted,
                 ),
             ).takeIf { it.hasOverrides() }
-            val defaultAdditionalLore = entry.questAdditionalLore.map { parseLines(it) }
             if (entry.questOrders.size > entry.questRefs.size) {
                 plugin.logger.warning(
                     "[QuestCodex] Quest category '${entry.category}' defines more quest orders than quest refs; extra orders will be ignored."
@@ -97,22 +107,20 @@ object QuestCodexInitializer : Initializable {
                 if (questOverride != null) {
                     unusedOverrides -= questId
                 }
-                val quest = ref.get()
-                if (quest != null) {
-                    val order = entry.questOrders.getOrNull(index)?.takeIf { it != 0 }
-                    val questItemOverrides = questOverride?.toItemOverrides()?.takeIf { it.hasOverrides() }
-                    val questDisplayOverrides = questOverride?.toDisplayOverrides()?.takeIf { it.hasOverrides() }
-                    val questAdditionalLore = questOverride?.additionalLoreLines().orEmpty()
-                    val defaultAdditionalLoreForQuest = defaultAdditionalLore.getOrNull(index).orEmpty()
-                    val mergedAdditionalLore = when {
-                        questAdditionalLore.isNotEmpty() -> questAdditionalLore
-                        else -> defaultAdditionalLoreForQuest
-                    }
-                    val mergedItemOverrides = when {
-                        defaultItemOverrides != null && questItemOverrides != null ->
-                            defaultItemOverrides.overrideWith(questItemOverrides)
-                        questItemOverrides != null -> questItemOverrides
-                        else -> defaultItemOverrides
+                    val quest = ref.get()
+                    if (quest != null) {
+                        val order = entry.questOrders.getOrNull(index)?.takeIf { it != 0 }
+                        val questItemOverrides = questOverride?.toItemOverrides()?.takeIf { it.hasOverrides() }
+                        val questDisplayOverrides = questOverride?.toDisplayOverrides()?.takeIf { it.hasOverrides() }
+                        val overrideAdditionalLore = questOverride?.additionalLore()
+                        val baseAdditionalLore = additionalLoreByQuestId[questId] ?: QuestAdditionalLore()
+                        val mergedAdditionalLore = overrideAdditionalLore?.let { baseAdditionalLore.overrideWith(it) }
+                            ?: baseAdditionalLore
+                        val mergedItemOverrides = when {
+                            defaultItemOverrides != null && questItemOverrides != null ->
+                                defaultItemOverrides.overrideWith(questItemOverrides)
+                            questItemOverrides != null -> questItemOverrides
+                            else -> defaultItemOverrides
                     }
                     val mergedDisplayOverrides = when {
                         defaultDisplayOverrides != null && questDisplayOverrides != null ->
@@ -127,7 +135,7 @@ object QuestCodexInitializer : Initializable {
                         order,
                         mergedItemOverrides,
                         mergedDisplayOverrides,
-                        mergedAdditionalLore.takeIf { it.isNotEmpty() },
+                        mergedAdditionalLore.takeIf { it.hasContent() },
                     )
                 } else if (questOverride != null) {
                     plugin.logger.warning(
@@ -259,7 +267,11 @@ private fun QuestCategoryQuestOverride.toDisplayOverrides(): QuestDisplayOverrid
     ),
 )
 
-private fun QuestCategoryQuestOverride.additionalLoreLines(): List<String> = parseLines(additionalLore)
+private fun QuestCategoryQuestOverride.additionalLore(): QuestAdditionalLore = QuestAdditionalLore(
+    notStarted = parseLines(additionalLoreNotStarted),
+    inProgress = parseLines(additionalLoreInProgress),
+    completed = parseLines(additionalLoreCompleted),
+)
 
 private fun buildQuestOverrideMap(entry: QuestCategoryEntry): Map<String, QuestCategoryQuestOverride> {
     if (entry.questOverrides.isEmpty()) return emptyMap()

@@ -11,7 +11,7 @@ import com.typewritermc.core.entries.Query
 import com.typewritermc.engine.paper.command.dsl.ArgumentBlock
 import com.typewritermc.engine.paper.command.dsl.DslCommandTree
 import com.typewritermc.engine.paper.command.dsl.argument
-import com.typewritermc.quest.QuestEntry
+import com.typewritermc.quest.entries.QuestEntry
 import io.papermc.paper.command.brigadier.argument.CustomArgumentType
 import java.util.Locale
 import java.util.concurrent.CompletableFuture

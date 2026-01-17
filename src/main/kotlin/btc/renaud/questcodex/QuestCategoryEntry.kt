@@ -12,7 +12,7 @@ import com.typewritermc.core.extension.annotations.Placeholder
 import com.typewritermc.engine.paper.content.modes.custom.HoldingItemContentMode
 import com.typewritermc.engine.paper.entry.ManifestEntry
 import com.typewritermc.engine.paper.utils.item.Item
-import com.typewritermc.quest.QuestEntry
+import com.typewritermc.quest.entries.QuestEntry
 
 @Entry(
     "quest_category",

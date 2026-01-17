@@ -1,4 +1,4 @@
-ï»¿package btc.renaud.questcodex
+package btc.renaud.questcodex
 
 import com.typewritermc.core.books.pages.Colors
 import com.typewritermc.core.entries.Ref
@@ -9,7 +9,7 @@ import com.typewritermc.core.extension.annotations.Help
 import com.typewritermc.core.extension.annotations.MultiLine
 import com.typewritermc.core.extension.annotations.Placeholder
 import com.typewritermc.engine.paper.entry.ManifestEntry
-import com.typewritermc.quest.QuestEntry
+import com.typewritermc.quest.entries.QuestEntry
 
 @Entry(
     "quest_additional_lore",
@@ -22,13 +22,13 @@ class QuestAdditionalLoreEntry(
     override val name: String = "",
     @Help("Quest to attach the additional lore to")
     val quest: Ref<QuestEntry> = emptyRef(),
-    @Help("Lore additionnel affichÃ© en bas du bouton quand le statut est Not Started")
+    @Help("Lore additionnel affiché en bas du bouton quand le statut est Not Started")
     @Placeholder @Colored @MultiLine
     val additionalLoreNotStarted: String = "",
-    @Help("Lore additionnel affichÃ© en bas du bouton quand le statut est In Progress")
+    @Help("Lore additionnel affiché en bas du bouton quand le statut est In Progress")
     @Placeholder @Colored @MultiLine
     val additionalLoreInProgress: String = "",
-    @Help("Lore additionnel affichÃ© en bas du bouton quand le statut est Completed")
+    @Help("Lore additionnel affiché en bas du bouton quand le statut est Completed")
     @Placeholder @Colored @MultiLine
     val additionalLoreCompleted: String = "",
 ) : ManifestEntry

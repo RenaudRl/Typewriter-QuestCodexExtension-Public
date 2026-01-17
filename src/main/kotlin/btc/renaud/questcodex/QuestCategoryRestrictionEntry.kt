@@ -8,7 +8,7 @@ import com.typewritermc.core.extension.annotations.Help
 import com.typewritermc.core.extension.annotations.Placeholder
 import com.typewritermc.core.extension.annotations.Colored
 import com.typewritermc.core.extension.annotations.MultiLine
-import com.typewritermc.quest.QuestEntry
+import com.typewritermc.quest.entries.QuestEntry
 
 /**
  * Defines additional restriction lore for quests in a specific category.

@@ -9,10 +9,10 @@ import com.typewritermc.engine.paper.utils.splitComponents
 import com.typewritermc.engine.paper.entry.descendants
 import com.typewritermc.engine.paper.entry.entries.LinesEntry
 import com.typewritermc.core.entries.ref
-import com.typewritermc.quest.ObjectiveEntry
-import com.typewritermc.quest.QuestEntry
+import com.typewritermc.quest.entries.ObjectiveEntry
+import com.typewritermc.quest.entries.QuestEntry
 import com.typewritermc.quest.QuestStatus
-import com.typewritermc.quest.questShowingObjectives
+import com.typewritermc.quest.entries.questShowingObjectives
 import com.typewritermc.quest.isQuestTracked
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextDecoration

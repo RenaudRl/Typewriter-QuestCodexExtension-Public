@@ -44,7 +44,7 @@ cd Typewriter-QuestCodexExtension-Public
 
 ## 🤝 Credits & Inspiration
 - **[TypeWriter](https://github.com/gabber235/Typewriter)** - The engine this extension is built for.
-- **[BTC Studio](https://borntocraft.fr)** - Maintenance and specialized optimizations.
+- **[BTC Studio](https://github.com/RenaudRl)** - Maintenance and specialized optimizations.
 
 ---
 

@@ -237,8 +237,13 @@ object QuestCategoryRegistry {
         overrides: QuestItemOverrides? = null,
         displayOverrides: QuestDisplayOverrides? = null,
         additionalLore: QuestAdditionalLore? = null,
+        title: String = "",
+        iconName: String = "",
     ) {
         val category = ensure(categoryName)
+        if (title.isNotBlank()) category.title = title
+        if (iconName.isNotBlank()) category.iconName = iconName
+
         if (!category.quests.contains(questRef)) {
             category.quests.add(questRef)
         }

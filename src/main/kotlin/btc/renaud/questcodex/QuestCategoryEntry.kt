@@ -31,6 +31,14 @@ class QuestCategoryEntry(
     val questOverrides: List<QuestCategoryQuestOverride> = emptyList(),
     @Help("Name of the category to register the quests in")
     val category: String = "",
+    @Help("Title used for the menu inventory")
+    @Placeholder
+    @Colored
+    val title: String = "",
+    @Help("Display name applied to the category icon")
+    @Placeholder
+    @Colored
+    val iconName: String = "",
     @Help("Item displayed when the quest is locked/inactive")
     @ContentEditor(HoldingItemContentMode::class)
     val notStartedItem: Item = Item.Empty,

@@ -147,7 +147,7 @@ class QuestCategoryMainInventory(
             else -> ItemStack(Material.BOOK)
         }
         return baseItem.apply {
-            itemMeta = itemMeta.apply {
+            itemMeta = itemMeta?.apply {
                 val styleString = if (category.nameColor.isNotBlank()) category.nameColor else menuConfig.categoryNameColor
                 val styleComponent = styleString.parsePlaceholders(player).asMini()
                 val rawIconName = if (category.iconName.isNotBlank()) category.iconName else category.title

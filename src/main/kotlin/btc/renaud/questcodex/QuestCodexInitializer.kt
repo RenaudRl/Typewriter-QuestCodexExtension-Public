@@ -161,6 +161,7 @@ object QuestCodexInitializer : Initializable {
                 }
             }
         }
+        BlueMapIntegrationService.initialize()
     }
 
     override suspend fun shutdown() {

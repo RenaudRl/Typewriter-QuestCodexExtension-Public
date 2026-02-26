@@ -3,7 +3,6 @@ package btc.renaud.questcodex
 import com.typewritermc.core.extension.annotations.Singleton
 import com.typewritermc.engine.paper.extensions.placeholderapi.PlaceholderHandler
 import com.typewritermc.quest.QuestStatus
-import com.typewritermc.quest.entries.QuestEntry
 import org.bukkit.entity.Player
 
 @Singleton
@@ -11,30 +10,25 @@ class QuestCodexPlaceholders : PlaceholderHandler {
     override fun onPlaceholderRequest(player: Player?, params: String): String? {
         val p = player ?: return null
         val key = params.lowercase()
-        
-        // Cache all unique quests to avoid re-calculating for each total placeholder in a single request
-        // Note: In a real high-performance scenario, we'd cache this longer, but for PAPI request it's okay-ish.
-        // However, QuestCategoryRegistry.all() already does quite some work.
-        
         return when {
             key == "total_quests" -> {
-                val quests = getAllUniqueQuests()
-                quests.size.toString()
+                val total = QuestCategoryRegistry.all().flatMap { it.allQuests() }.toSet().size
+                total.toString()
             }
             key == "total_completed" -> {
-                val quests = getAllUniqueQuests()
+                val quests = QuestCategoryRegistry.all().flatMap { it.allQuests() }.toSet()
                 quests.count { it.questStatus(p) == QuestStatus.COMPLETED }.toString()
             }
             key == "total_in_progress" || key == "total_inprogress" -> {
-                val quests = getAllUniqueQuests()
+                val quests = QuestCategoryRegistry.all().flatMap { it.allQuests() }.toSet()
                 quests.count { it.questStatus(p) == QuestStatus.ACTIVE }.toString()
             }
             key == "total_not_started" || key == "total_notstarted" -> {
-                val quests = getAllUniqueQuests()
+                val quests = QuestCategoryRegistry.all().flatMap { it.allQuests() }.toSet()
                 quests.count { it.questStatus(p) == QuestStatus.INACTIVE }.toString()
             }
             key == "total_progress" -> {
-                val quests = getAllUniqueQuests()
+                val quests = QuestCategoryRegistry.all().flatMap { it.allQuests() }.toSet()
                 val completed = quests.count { it.questStatus(p) == QuestStatus.COMPLETED }
                 val total = quests.size
                 "$completed/$total"
@@ -59,7 +53,7 @@ class QuestCodexPlaceholders : PlaceholderHandler {
                     }
                 }
                 val categoryName = rawName.replace('_', ' ')
-                val category = QuestCategoryRegistry.find(categoryName) ?: return null
+                val category = QuestCategoryRegistry.find(categoryName) ?: return "0"
                 val quests = category.allQuests()
                 when (status) {
                     "completed" -> quests.count { it.questStatus(p) == QuestStatus.COMPLETED }.toString()
@@ -74,10 +68,6 @@ class QuestCodexPlaceholders : PlaceholderHandler {
             }
             else -> null
         }
-    }
-
-    private fun getAllUniqueQuests(): Set<QuestEntry> {
-        return QuestCategoryRegistry.all().flatMap { it.allQuests() }.toSet()
     }
 }
 

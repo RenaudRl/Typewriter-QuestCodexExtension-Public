@@ -136,8 +136,6 @@ object QuestCodexInitializer : Initializable {
                         mergedItemOverrides,
                         mergedDisplayOverrides,
                         mergedAdditionalLore.takeIf { it.hasContent() },
-                        title = entry.title,
-                        iconName = entry.iconName,
                     )
                 } else if (questOverride != null) {
                     plugin.logger.warning(
@@ -161,7 +159,6 @@ object QuestCodexInitializer : Initializable {
                 }
             }
         }
-        BlueMapIntegrationService.initialize()
     }
 
     override suspend fun shutdown() {

@@ -1,9 +1,12 @@
 repositories {
-     mavenCentral()
+    mavenCentral()
+    maven("https://repo.bluecolored.de/releases")
 }
 dependencies {
-    compileOnly("com.typewritermc:QuestExtension:0.9.0")
-    compileOnly(kotlin("reflect"))
+    implementation("com.typewritermc:QuestExtension:0.9.0")
+    implementation(kotlin("reflect"))
+    compileOnly("de.bluecolored:bluemap-api:2.7.3")
+    compileOnly("com.flowpowered:flow-math:1.0.3")
 }
 
 plugins {

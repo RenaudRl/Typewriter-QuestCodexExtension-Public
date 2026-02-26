@@ -47,21 +47,21 @@ data class QuestCategory(
     var completedMessage: List<String> = emptyList(),
     /** Display order for this category. Categories with lower numbers appear first. */
     var order: Int = 0,
-    val quests: MutableList<Ref<QuestEntry>> = java.util.concurrent.CopyOnWriteArrayList(),
+    val quests: MutableList<Ref<QuestEntry>> = mutableListOf(),
     /** Optional ordering for quests within this category. */
-    val questOrders: MutableMap<String, Int> = java.util.concurrent.ConcurrentHashMap(),
+    val questOrders: MutableMap<String, Int> = mutableMapOf(),
     /** Optional quest item overrides per quest and status. */
-    val questItems: MutableMap<String, QuestItemOverrides> = java.util.concurrent.ConcurrentHashMap(),
+    val questItems: MutableMap<String, QuestItemOverrides> = mutableMapOf(),
     /** Optional quest display overrides per quest and status. */
-    val questDisplays: MutableMap<String, QuestDisplayOverrides> = java.util.concurrent.ConcurrentHashMap(),
+    val questDisplays: MutableMap<String, QuestDisplayOverrides> = mutableMapOf(),
     /** Optional extra lore appended after the quest's main lore for each quest, per status. */
-    val questAdditionalLore: MutableMap<String, QuestAdditionalLore> = java.util.concurrent.ConcurrentHashMap(),
+    val questAdditionalLore: MutableMap<String, QuestAdditionalLore> = mutableMapOf(),
     /** Optional restriction messages for quests in this category. */
-    val restrictions: MutableMap<String, List<String>> = java.util.concurrent.ConcurrentHashMap(),
+    val restrictions: MutableMap<String, List<String>> = mutableMapOf(),
     /** Parent category if this category is a sub-category. */
     var parent: QuestCategory? = null,
     /** Child categories registered under this category. */
-    val subCategories: MutableList<QuestCategory> = java.util.concurrent.CopyOnWriteArrayList(),
+    val subCategories: MutableList<QuestCategory> = mutableListOf(),
     /** Optional per-category quest count lore override. */
     var categoryLoreQuestCountOverride: List<String>? = null,
     /** Optional per-category lore override. */
@@ -152,7 +152,7 @@ data class QuestAdditionalLore(
  * Simple registry used by the extension to manage quest categories.
  */
 object QuestCategoryRegistry {
-    private val categories: MutableMap<String, QuestCategory> = java.util.concurrent.ConcurrentHashMap()
+    private val categories: MutableMap<String, QuestCategory> = mutableMapOf()
 
     /**
      * Register a new category if it doesn't already exist. When registering
@@ -196,7 +196,7 @@ object QuestCategoryRegistry {
         if (questSlots.isNotEmpty()) {
             category.questSlots = questSlots.filter { it >= 0 }
         }
-        if (parent.isNotBlank() && parent.lowercase() != key) {
+        if (parent.isNotBlank()) {
             val parentCategory = ensure(parent)
             category.parent = parentCategory
             if (!parentCategory.subCategories.contains(category)) {
@@ -237,13 +237,8 @@ object QuestCategoryRegistry {
         overrides: QuestItemOverrides? = null,
         displayOverrides: QuestDisplayOverrides? = null,
         additionalLore: QuestAdditionalLore? = null,
-        title: String = "",
-        iconName: String = "",
     ) {
         val category = ensure(categoryName)
-        if (title.isNotBlank()) category.title = title
-        if (iconName.isNotBlank()) category.iconName = iconName
-
         if (!category.quests.contains(questRef)) {
             category.quests.add(questRef)
         }
@@ -305,10 +300,8 @@ object QuestCategoryRegistry {
 /**
  * Recursively collect all quests registered under this category and its sub-categories.
  */
-fun QuestCategory.allQuests(visited: MutableSet<String> = mutableSetOf()): List<QuestEntry> {
-    if (!visited.add(name.lowercase())) return emptyList()
-    return (quests.mapNotNull { it.get() } + subCategories.flatMap { it.allQuests(visited) }).distinct()
-}
+fun QuestCategory.allQuests(): List<QuestEntry> =
+    (quests.mapNotNull { it.get() } + subCategories.flatMap { it.allQuests() }).distinct()
 
 enum class CategoryStatus {
     BLOCKED,

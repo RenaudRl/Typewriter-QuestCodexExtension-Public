@@ -7,6 +7,9 @@ import com.typewritermc.quest.QuestStatus
 import com.typewritermc.quest.isQuestTracked
 import com.typewritermc.quest.trackQuest
 import com.typewritermc.quest.unTrackQuest
+import com.typewritermc.core.interaction.context
+import com.typewritermc.engine.paper.entry.triggerFor
+import com.typewritermc.quest.entries.questShowingObjectives
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -14,6 +17,29 @@ import org.bukkit.event.inventory.InventoryAction
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryDragEvent
 import java.util.logging.Level
+
+/**
+ * Helper function to open the appropriate quest category menu based on its content.
+ */
+fun openQuestCodexMenu(
+    player: Player,
+    category: QuestCategory?,
+    sort: QuestCategoryInventory.SortOption = QuestCategoryInventory.SortOption.ALL
+) {
+    if (category == null) {
+        player.openInventory(QuestCategoryMainInventory(player).getInventory())
+        return
+    }
+
+    val showQuests = category.showQuestButton && category.quests.isNotEmpty()
+    
+    val nextInventory = if (showQuests) {
+        QuestCategoryInventory(player, category, sort).getInventory()
+    } else {
+        QuestCategoryMainInventory(player, category).getInventory()
+    }
+    player.openInventory(nextInventory)
+}
 
 /** Handles interactions with quest category inventories. */
 class QuestCategoryListener : Listener {
@@ -24,7 +50,7 @@ class QuestCategoryListener : Listener {
 
         try {
             if (event.action == InventoryAction.COLLECT_TO_CURSOR &&
-                (holder is QuestCategoryInventory || holder is QuestCategoryMainInventory)
+                (holder is QuestCategoryInventory || holder is QuestCategoryMainInventory || holder is PrologueReplayInventory)
             ) {
                 event.isCancelled = true
                 return
@@ -66,29 +92,58 @@ class QuestCategoryListener : Listener {
                         }
                         holder.backSlot -> {
                             val parent = holder.category.parent
-                            player.openInventory(QuestCategoryMainInventory(player, parent).getInventory())
+                            openQuestCodexMenu(player, parent)
                             player.playCodexSound(codexSoundButtonBack)
                             player.playCodexSound(codexSoundMenuSwitch)
                         }
+                        holder.replaySlot -> {
+                            val replayCategory = PrologueReplayRegistry.findByQuestCategory(holder.category.name)
+                            player.openInventory(PrologueReplayInventory(player, replayCategory).getInventory())
+                            player.playCodexSound(codexSoundButtonCategory)
+                            player.playCodexSound(codexSoundMenuOpen)
+                        }
                         else -> {
-                            val quest = holder.questForSlot(event.rawSlot) ?: return
-                            if (event.isLeftClick) {
-                                val ref = quest.ref()
-                                val status = quest.questStatus(player)
-                                if (status != QuestStatus.ACTIVE) {
-                                    return
+                            val quest = holder.questForSlot(event.rawSlot)
+                            if (quest != null) {
+                                if (event.isLeftClick) {
+                                    val ref = quest.ref()
+                                    val status = quest.questStatus(player)
+                                    if (status != QuestStatus.ACTIVE) {
+                                        return
+                                    }
+                                    if (player isQuestTracked ref) {
+                                        player.unTrackQuest()
+                                        player.playCodexSound(codexSoundButtonQuestUntrack)
+                                    } else {
+                                        player.trackQuest(ref)
+                                        player.playCodexSound(codexSoundButtonQuestTrack)
+                                    }
+                                    holder.loadPage(holder.currentPage)
+                                    player.openInventory(holder.getInventory())
+                                    player.playCodexSound(codexSoundMenuSwitch)
+                                } else if (event.isLeftClick && event.isShiftClick) {
+                                    // Handle Shift + Left Click from Quest+
+                                    val ref = quest.ref()
+                                    if (quest.questStatus(player) == QuestStatus.ACTIVE && player isQuestTracked ref) {
+                                        val objectives = player.questShowingObjectives(ref)
+                                        val triggered = objectives.any { QuestPlusIntegration.triggerGpsShiftClick(it, player) }
+
+                                        if (triggered) {
+                                            player.playCodexSound(codexSoundButtonQuestTrack)
+                                            holder.loadPage(holder.currentPage)
+                                            player.openInventory(holder.getInventory())
+                                        }
+                                    }
                                 }
-                                if (player isQuestTracked ref) {
-                                    player.unTrackQuest()
-                                    player.playCodexSound(codexSoundButtonQuestUntrack)
-                                } else {
-                                    player.trackQuest(ref)
-                                    player.playCodexSound(codexSoundButtonQuestTrack)
-                                }
-                                holder.loadPage(holder.currentPage)
-                                player.openInventory(holder.getInventory())
-                                player.playCodexSound(codexSoundMenuSwitch)
+                                return
                             }
+
+                            val subCategory = holder.categoryForSlot(event.rawSlot) ?: return
+                            if (subCategory.categoryStatus(player) == CategoryStatus.BLOCKED) return
+
+                            openQuestCodexMenu(player, subCategory)
+                            player.playCodexSound(codexSoundButtonCategory)
+                            player.playCodexSound(codexSoundMenuOpen)
                         }
                     }
                 }
@@ -139,9 +194,16 @@ class QuestCategoryListener : Listener {
                                 return
                             }
                             val parent = holder.parent()
-                            player.openInventory(QuestCategoryMainInventory(player, parent?.parent).getInventory())
+                            openQuestCodexMenu(player, parent?.parent)
                             player.playCodexSound(codexSoundButtonBack)
                             player.playCodexSound(codexSoundMenuSwitch)
+                        }
+                        holder.replaySlot() -> {
+                            val parent = holder.parent()
+                            val replayCategory = parent?.let { PrologueReplayRegistry.findByQuestCategory(it.name) }
+                            player.openInventory(PrologueReplayInventory(player, replayCategory).getInventory())
+                            player.playCodexSound(codexSoundButtonCategory)
+                            player.playCodexSound(codexSoundMenuOpen)
                         }
                         holder.infoSlot() -> {
                             // No action for info button
@@ -151,17 +213,26 @@ class QuestCategoryListener : Listener {
                             if (category.categoryStatus(player) == CategoryStatus.BLOCKED) {
                                 return
                             }
-                            if (category.subCategories.isNotEmpty()) {
-                                player.openInventory(QuestCategoryMainInventory(player, category).getInventory())
-                            } else {
-                                player.openInventory(QuestCategoryInventory(player, category).getInventory())
-                            }
+                            
+                            val showCategories = category.showCategoriesButton && category.subCategories.isNotEmpty()
+                            val showQuests = category.showQuestButton
+                            val showPrologue = category.showPrologueButton
+                            
+                            openQuestCodexMenu(player, category)
                             player.playCodexSound(codexSoundButtonCategory)
                             player.playCodexSound(codexSoundMenuOpen)
                         }
                     }
                 }
 
+                is PrologueReplayInventory -> {
+                    if (event.clickedInventory != event.view.bottomInventory || event.isShiftClick) {
+                        event.isCancelled = true
+                    }
+                    if (event.clickedInventory != event.view.topInventory) return
+                    holder.handleInteraction(event.rawSlot)
+                    player.playCodexSound(codexSoundButtonCategory)
+                }
                 else -> return
             }
         } catch (_: NoClassDefFoundError) {
@@ -173,7 +244,7 @@ class QuestCategoryListener : Listener {
     fun onInventoryDrag(event: InventoryDragEvent) {
         val holder = event.view.topInventory.holder ?: return
         try {
-            if (holder is QuestCategoryInventory || holder is QuestCategoryMainInventory) {
+            if (holder is QuestCategoryInventory || holder is QuestCategoryMainInventory || holder is PrologueReplayInventory) {
                 event.isCancelled = true
             }
         } catch (_: NoClassDefFoundError) {

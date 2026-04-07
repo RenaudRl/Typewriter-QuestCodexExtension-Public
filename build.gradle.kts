@@ -1,6 +1,14 @@
+plugins {
+    kotlin("jvm") version "2.2.10"
+    id("com.typewritermc.module-plugin") version "2.1.0"
+}
+
 repositories {
     mavenCentral()
     maven("https://repo.bluecolored.de/releases")
+    flatDir {
+        dir("libs")
+    }
 }
 dependencies {
     implementation("com.typewritermc:QuestExtension:0.9.0")
@@ -9,13 +17,8 @@ dependencies {
     compileOnly("com.flowpowered:flow-math:1.0.3")
 }
 
-plugins {
-    kotlin("jvm") version "2.2.10"
-    id("com.typewritermc.module-plugin")
-}
-
 group = "btc.renaud"
-version = "0.1.0"
+version = "0.2.0"
 
 typewriter {
     namespace = "renaud"
@@ -27,7 +30,7 @@ typewriter {
             |A quest codex for Typewriter that allows players to view and manage their quests
             |Multiples menus, organized by status and tracking progress with quest categories.
             """.trimMargin()
-        engineVersion = file("../../version.txt").readText().trim()
+        engineVersion = "0.9.0-beta-172"
         channel = com.typewritermc.moduleplugin.ReleaseChannel.BETA
 
         dependencies {
@@ -40,4 +43,6 @@ typewriter {
 kotlin {
     jvmToolchain(21)
 }
+
+
 

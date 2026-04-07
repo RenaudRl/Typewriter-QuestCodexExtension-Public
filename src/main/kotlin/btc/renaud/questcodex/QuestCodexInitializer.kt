@@ -7,6 +7,8 @@ import com.typewritermc.engine.paper.plugin
 import org.bukkit.Bukkit
 import org.bukkit.event.inventory.InventoryClickEvent
 import java.util.logging.Level
+import com.typewritermc.engine.paper.utils.item.*
+import kotlin.reflect.KClass
 
 /**
  * Basic initializer for the Quest Codex extension.
@@ -16,15 +18,27 @@ import java.util.logging.Level
 @Singleton
 object QuestCodexInitializer : Initializable {
     private val listener = QuestCategoryListener()
+    private var refreshTask: org.bukkit.scheduler.BukkitTask? = null
 
     override suspend fun initialize() {
         val manager = Bukkit.getPluginManager()
         manager.registerEvents(listener, plugin)
 
+        // BTC Engine Native Support
+        try {
+            val itemCompanion = Class.forName("com.typewritermc.engine.paper.utils.item.Item\$Companion")
+            val instance = itemCompanion.getField("INSTANCE").get(null)
+            val registerAll = itemCompanion.getMethod("registerAll")
+            registerAll.invoke(instance)
+            plugin.logger.info("[QuestCodex] BTC Custom Engine detected. Native item types registered.")
+        } catch (_: Exception) {
+            // Not running on BTC Engine or registerAll not available
+        }
+
         QuestCodexConfig.reset()
         val settingsEntries = Query.find<QuestCodexSettingsEntry>().toList()
         if (settingsEntries.isEmpty()) {
-            plugin.logger.fine("[QuestCodex] No quest_codex_settings entry found; applying default configuration.")
+            plugin.logger.info("[QuestCodex] No quest_codex_settings entry found; using transient defaults. (Note: in-game item capture requires a published entry).")
             QuestCodexConfig.apply(QuestCodexDefaults.settingsEntry())
         } else {
             settingsEntries.forEach { entry ->
@@ -43,7 +57,7 @@ object QuestCodexInitializer : Initializable {
                 parent = it.parent,
                 order = it.order,
                 slot = it.slot.takeIf { slot -> slot >= 0 },
-                questSlots = parseQuestSlots(it.questSlots, it.category),
+                questSlots = parseSlots(it.questSlots, "category ${it.category}"),
                 activeCriteria = it.activeCriteria,
                 completedCriteria = it.completedCriteria,
                 blockedMessage = parseLines(it.blockedMessage),
@@ -54,6 +68,23 @@ object QuestCodexInitializer : Initializable {
                 iconName = it.iconName,
                 categoryLoreQuestCount = parseOptionalLore(it.categoryLoreQuestCount),
                 categoryLore = parseOptionalLore(it.categoryLore),
+                refQuest = it.refQuest,
+                showPrologueButton = it.showPrologueButton,
+                showQuestButton = it.showQuestButton,
+                showCategoriesButton = it.showCategoriesButton,
+            )
+        }
+
+        // Register prologue replay categories
+        Query.find<PrologueReplayCategoryEntry>().forEach { entry ->
+            PrologueReplayRegistry.register(
+                id = entry.id,
+                title = entry.title.ifBlank { entry.name },
+                item = entry.item,
+                order = entry.order,
+                slot = entry.slot ?: -1,
+                questCategory = entry.questCategory,
+                entries = entry.entries
             )
         }
 
@@ -103,24 +134,25 @@ object QuestCodexInitializer : Initializable {
             val unusedOverrides = questOverrideMap.keys.toMutableSet()
             entry.questRefs.forEachIndexed { index, ref ->
                 val questId = ref.id
+                if (questId.isBlank()) return@forEachIndexed
                 val questOverride = questOverrideMap[questId]
                 if (questOverride != null) {
                     unusedOverrides -= questId
                 }
-                    val quest = ref.get()
-                    if (quest != null) {
-                        val order = entry.questOrders.getOrNull(index)?.takeIf { it != 0 }
-                        val questItemOverrides = questOverride?.toItemOverrides()?.takeIf { it.hasOverrides() }
-                        val questDisplayOverrides = questOverride?.toDisplayOverrides()?.takeIf { it.hasOverrides() }
-                        val overrideAdditionalLore = questOverride?.additionalLore()
-                        val baseAdditionalLore = additionalLoreByQuestId[questId] ?: QuestAdditionalLore()
-                        val mergedAdditionalLore = overrideAdditionalLore?.let { baseAdditionalLore.overrideWith(it) }
-                            ?: baseAdditionalLore
-                        val mergedItemOverrides = when {
-                            defaultItemOverrides != null && questItemOverrides != null ->
-                                defaultItemOverrides.overrideWith(questItemOverrides)
-                            questItemOverrides != null -> questItemOverrides
-                            else -> defaultItemOverrides
+                val quest = ref.get()
+                if (quest != null) {
+                    val order = entry.questOrders.getOrNull(index)?.takeIf { it != 0 }
+                    val questItemOverrides = questOverride?.toItemOverrides()?.takeIf { it.hasOverrides() }
+                    val questDisplayOverrides = questOverride?.toDisplayOverrides()?.takeIf { it.hasOverrides() }
+                    val overrideAdditionalLore = questOverride?.additionalLore()
+                    val baseAdditionalLore = additionalLoreByQuestId[questId] ?: QuestAdditionalLore()
+                    val mergedAdditionalLore = overrideAdditionalLore?.let { baseAdditionalLore.overrideWith(it) }
+                        ?: baseAdditionalLore
+                    val mergedItemOverrides = when {
+                        defaultItemOverrides != null && questItemOverrides != null ->
+                            defaultItemOverrides.overrideWith(questItemOverrides)
+                        questItemOverrides != null -> questItemOverrides
+                        else -> defaultItemOverrides
                     }
                     val mergedDisplayOverrides = when {
                         defaultDisplayOverrides != null && questDisplayOverrides != null ->
@@ -137,10 +169,12 @@ object QuestCodexInitializer : Initializable {
                         mergedDisplayOverrides,
                         mergedAdditionalLore.takeIf { it.hasContent() },
                     )
-                } else if (questOverride != null) {
-                    plugin.logger.warning(
-                        "[QuestCodex] Quest category '${entry.category}' defines overrides for quest $questId, but the quest could not be resolved."
-                    )
+                } else {
+                    if (questId.isNotBlank() && questOverride != null) {
+                        plugin.logger.warning(
+                            "[QuestCodex] Quest category '${entry.category}' defines overrides for quest $questId, but the quest could not be resolved."
+                        )
+                    }
                 }
             }
             if (unusedOverrides.isNotEmpty()) {
@@ -159,10 +193,23 @@ object QuestCodexInitializer : Initializable {
                 }
             }
         }
+
+        // Periodic refresh for open Codex inventories to avoid manual reloads
+        refreshTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
+            Bukkit.getOnlinePlayers().forEach { player ->
+                val holder = player.openInventory.topInventory.holder
+                if (holder is QuestCategoryInventory) {
+                    holder.loadPage(holder.currentPage)
+                } else if (holder is QuestCategoryMainInventory) {
+                    holder.loadPage(holder.currentPage)
+                }
+            }
+        }, 40L, 40L)
     }
 
     override suspend fun shutdown() {
         InventoryClickEvent.getHandlerList().unregister(listener)
+        refreshTask?.cancel()
 
         when {
             Bukkit.isPrimaryThread() -> closeQuestInventories()
@@ -174,7 +221,7 @@ object QuestCodexInitializer : Initializable {
     private fun closeQuestInventories() {
         Bukkit.getOnlinePlayers().forEach { player ->
             val holder = player.openInventory.topInventory.holder
-            if (holder is QuestCategoryInventory || holder is QuestCategoryMainInventory) {
+            if (holder is QuestCategoryInventory || holder is QuestCategoryMainInventory || holder is PrologueReplayInventory) {
                 player.closeInventory()
             }
         }
@@ -188,43 +235,16 @@ object QuestCodexInitializer : Initializable {
             action()
         }
     }
-}
 
-private fun parseQuestSlots(rawSlots: List<String>, category: String): List<Int> {
-    if (rawSlots.isEmpty()) return emptyList()
-    val resolved = linkedSetOf<Int>()
-    for (raw in rawSlots) {
-        val token = raw.trim()
-        if (token.isEmpty()) continue
-        val rangeParts = token.split('-', limit = 2).map { it.trim() }
-        if (rangeParts.size == 1) {
-            val value = rangeParts[0].toIntOrNull()
-            if (value != null) {
-                resolved += value
-            } else {
-                plugin.logger.warning(
-                    "[QuestCodex] Invalid quest slot '$token' for category $category. Expected a number or range."
-                )
-            }
-            continue
+    private fun validateRef(ref: com.typewritermc.core.entries.Ref<*>, entryId: String, entryType: String, fieldName: String): Boolean {
+        if (ref.id.isBlank()) {
+            plugin.logger.warning("[QuestCodex] Entry '$entryId' ($entryType) has an empty '$fieldName' reference. Skipping field.")
+            return false
         }
-
-        val start = rangeParts[0].toIntOrNull()
-        val end = rangeParts[1].toIntOrNull()
-        if (start == null || end == null) {
-            plugin.logger.warning(
-                "[QuestCodex] Invalid quest slot range '$token' for category $category. Expected numeric bounds."
-            )
-            continue
-        }
-
-        val (min, max) = if (start <= end) start to end else end to start
-        for (slot in min..max) {
-            resolved += slot
-        }
+        return true
     }
-    return resolved.toList()
 }
+
 
 private fun parseLines(raw: String): List<String> {
     val sanitized = raw.replace("\r", "")
@@ -293,4 +313,3 @@ private fun buildQuestOverrideMap(entry: QuestCategoryEntry): Map<String, QuestC
     }
     return overridesByQuest
 }
-

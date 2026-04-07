@@ -11,6 +11,7 @@ import com.typewritermc.core.extension.annotations.MultiLine
 import com.typewritermc.core.extension.annotations.Placeholder
 import com.typewritermc.engine.paper.content.modes.custom.HoldingItemContentMode
 import com.typewritermc.engine.paper.entry.ManifestEntry
+import com.typewritermc.engine.paper.utils.item.CustomItem
 import com.typewritermc.engine.paper.utils.item.Item
 import com.typewritermc.quest.entries.QuestEntry
 
@@ -33,13 +34,13 @@ class QuestCategoryEntry(
     val category: String = "",
     @Help("Item displayed when the quest is locked/inactive")
     @ContentEditor(HoldingItemContentMode::class)
-    val notStartedItem: Item = Item.Empty,
+    val notStartedItem: Item = CustomItem(),
     @Help("Item displayed while the quest is in progress")
     @ContentEditor(HoldingItemContentMode::class)
-    val inProgressItem: Item = Item.Empty,
+    val inProgressItem: Item = CustomItem(),
     @Help("Item displayed once the quest is completed")
     @ContentEditor(HoldingItemContentMode::class)
-    val completedItem: Item = Item.Empty,
+    val completedItem: Item = CustomItem(),
     @Help("Custom name used when the quest is not started")
     @Placeholder
     @Colored
@@ -84,13 +85,13 @@ data class QuestCategoryQuestOverride(
     val quest: Ref<QuestEntry> = emptyRef(),
     @Help("Item displayed when the quest is locked/inactive")
     @ContentEditor(HoldingItemContentMode::class)
-    val notStartedItem: Item = Item.Empty,
+    val notStartedItem: Item = CustomItem(),
     @Help("Item displayed while the quest is in progress")
     @ContentEditor(HoldingItemContentMode::class)
-    val inProgressItem: Item = Item.Empty,
+    val inProgressItem: Item = CustomItem(),
     @Help("Item displayed once the quest is completed")
     @ContentEditor(HoldingItemContentMode::class)
-    val completedItem: Item = Item.Empty,
+    val completedItem: Item = CustomItem(),
     @Help("Custom name used when the quest is not started")
     @Placeholder
     @Colored

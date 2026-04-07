@@ -8,8 +8,8 @@ import com.typewritermc.engine.paper.utils.server
 import com.typewritermc.engine.paper.utils.splitComponents
 import com.typewritermc.engine.paper.entry.descendants
 import com.typewritermc.engine.paper.entry.entries.LinesEntry
-import com.typewritermc.core.entries.ref
 import com.typewritermc.quest.entries.ObjectiveEntry
+import com.typewritermc.core.entries.ref
 import com.typewritermc.quest.entries.QuestEntry
 import com.typewritermc.quest.QuestStatus
 import com.typewritermc.quest.entries.questShowingObjectives
@@ -23,7 +23,9 @@ import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 
 fun Inventory.fillWith(player: Player, template: ItemTemplate) {
-    val fillItem = template.buildItem(player, Material.GRAY_STAINED_GLASS_PANE)
+    val fillMaterialStr = QuestCodexConfig.questMenu.defaultFillMaterial
+    val fillMaterial = Material.getMaterial(fillMaterialStr) ?: Material.GRAY_STAINED_GLASS_PANE
+    val fillItem = template.buildItem(player, fillMaterial)
     for (i in 0 until size) {
         if (getItem(i) == null) {
             setItem(i, fillItem)
@@ -49,11 +51,13 @@ class QuestCategoryInventory(
     )
     private val quests: List<QuestEntry> = category.quests.mapNotNull { it.get() }
     private val slotToQuest: MutableMap<Int, QuestEntry> = mutableMapOf()
+    private val slotToCategory: MutableMap<Int, QuestCategory> = mutableMapOf()
     private val questSlots: List<Int>
     val previousSlot: Int
     val nextSlot: Int
     val sortSlot: Int
     val backSlot: Int
+    val replaySlot: Int
     val maxQuestsPerPage: Int
     var filteredQuestsCount: Int = 0
     var currentPage = 0
@@ -71,6 +75,7 @@ class QuestCategoryInventory(
         nextSlot = menuConfig.buttons.next.resolveSlot(category.rows, inventorySize)
         sortSlot = menuConfig.buttons.sort.resolveSlot(category.rows, inventorySize)
         backSlot = menuConfig.buttons.back.resolveSlot(category.rows, inventorySize)
+        replaySlot = QuestCodexConfig.replayMenu.replayButton.resolveSlot(category.rows, inventorySize)
 
         maxQuestsPerPage = questSlots.size
 
@@ -81,6 +86,7 @@ class QuestCategoryInventory(
         currentPage = page
         inventory.clear()
         slotToQuest.clear()
+        slotToCategory.clear()
 
         val questViews = quests.map { quest -> quest to quest.questStatus(player) }
             .let { pairs ->
@@ -114,16 +120,44 @@ class QuestCategoryInventory(
         )
         filteredQuestsCount = visibleViews.size
 
-        val startIndex = page * maxQuestsPerPage
-        val endIndex = (startIndex + maxQuestsPerPage).coerceAtMost(sortedViews.size)
-        val questsToDisplay = sortedViews.subList(startIndex, endIndex)
+        val subCategories = if (category.showCategoriesButton) {
+            category.subCategories.filter { 
+                !(it.hideWhenLocked && it.categoryStatus(player) == CategoryStatus.BLOCKED) 
+            }
+        } else emptyList()
 
-        for ((view, slot) in questsToDisplay.zip(questSlots)) {
+        val allItems = buildList {
+            // We only show categories on the first page, or should they be paginated too?
+            // User requested to have them in the same menu. Let's include them in allItems for pagination.
+            addAll(subCategories)
+            addAll(sortedViews)
+        }
+
+        val startIndex = page * maxQuestsPerPage
+        val endIndex = (startIndex + maxQuestsPerPage).coerceAtMost(allItems.size)
+        val itemsToDisplay = allItems.subList(startIndex, endIndex)
+        filteredQuestsCount = allItems.size // Use all items for pagination count
+
+        for ((item, slot) in itemsToDisplay.zip(questSlots)) {
+            if (item is QuestCategory) {
+                val categoryButton = item.buildIcon(player, QuestCodexConfig.subMenu)
+                inventory.setItem(slot, categoryButton)
+                slotToCategory[slot] = item
+                continue
+            }
+            
+            val view = item as QuestView
             val quest = view.quest
             val ref = quest.ref()
             val status = view.status
             val displayOverride = category.questDisplays[quest.id]?.state(status)
-            val objectives: List<ObjectiveEntry> = player.questShowingObjectives(ref).toList()
+            val objectives: List<ObjectiveEntry> = player.questShowingObjectives(ref)
+                .filter { obj ->
+                    if (QuestPlusIntegration.isHidden(obj, player)) {
+                        false
+                    } else true
+                }
+                .toList()
             val description = quest.children.descendants(LinesEntry::class).mapNotNull { it.get() }
 
             // Build description lore from LinesEntry
@@ -170,7 +204,7 @@ class QuestCategoryInventory(
                         if (descriptionLore.isEmpty()) {
                             loreLines.add("")
                         }
-                        loreLines.addAll(objectives.map { it.display(player) })
+                        loreLines.addAll(objectives.map { it.display(player) }.filter { it.isNotBlank() })
                     }
                     loreLines.addAll(customLore)
                     loreLines.addAll(menuConfig.questButtons.inProgress.lore)
@@ -184,10 +218,25 @@ class QuestCategoryInventory(
             }.flatMap { it.split("\n") }
 
             val additionalLore = category.questAdditionalLore[quest.id]?.forStatus(status).orEmpty()
+            
+            // Collect QuestPlus specific Lore if tracked
+            val gpsLore = if (status == QuestStatus.ACTIVE && player isQuestTracked ref) {
+                objectives.mapNotNull { QuestPlusIntegration.getGpsCodexLore(it, player) }
+                    .filter { it.isNotBlank() }
+            } else {
+                emptyList()
+            }
+
             val rawLoreLines = buildList {
                 addAll(descriptionLore)
                 addAll(statusLore)
-                if (additionalLore.isNotEmpty() && (descriptionLore.isNotEmpty() || statusLore.isNotEmpty())) {
+                
+                if (gpsLore.isNotEmpty()) {
+                    if (isNotEmpty()) add("")
+                    addAll(gpsLore)
+                }
+
+                if (additionalLore.isNotEmpty() && (descriptionLore.isNotEmpty() || statusLore.isNotEmpty() || gpsLore.isNotEmpty())) {
                     add("")
                 }
                 addAll(additionalLore)
@@ -210,26 +259,29 @@ class QuestCategoryInventory(
                 QuestStatus.INACTIVE -> menuConfig.questButtons.notStarted
             }
 
-            val overrideItem = category.questItems[quest.id]?.itemFor(status)?.takeIf { it != Item.Empty }
+            val overrideItem = category.questItems[quest.id]?.itemFor(status)?.takeIf { !it.isEffectivelyEmpty() }
             val baseStack: ItemStack = overrideItem?.build(player) ?: template.baseItem(player, Material.BARRIER)
-            val questButton = baseStack.apply {
-                itemMeta = itemMeta.apply {
-                    val nameComponent = displayOverride?.name?.takeIf { it.isNotBlank() }
-                        ?.parsePlaceholders(player)
-                        ?.asMiniWithoutItalic()
-                        ?: quest.displayName.get(player).parsePlaceholders(player).asMiniWithoutItalic()
-                    displayName(nameComponent)
-                    lore(lore)
-                }
+            val meta = baseStack.itemMeta
+            if (meta != null) {
+                val nameComponent = displayOverride?.name?.takeIf { it.isNotBlank() }
+                    ?.parsePlaceholders(player)
+                    ?.asMiniWithoutItalic()
+                    ?: quest.displayName.get(player).parsePlaceholders(player).asMiniWithoutItalic()
+                meta.displayName(nameComponent)
+                meta.lore(lore)
+                baseStack.itemMeta = meta
             }
+            val questButton = baseStack
 
             inventory.setItem(slot, questButton)
             slotToQuest[slot] = quest
         }
 
         // Fill remaining quest slots with a dedicated placeholder
-        for (slot in questSlots.drop(questsToDisplay.size)) {
-            inventory.setItem(slot, menuConfig.emptyQuest.buildItem(player, Material.GRAY_STAINED_GLASS_PANE))
+        for (slot in questSlots.drop(itemsToDisplay.size)) {
+            val fillMaterialStr = menuConfig.defaultFillMaterial
+            val fillMaterial = Material.getMaterial(fillMaterialStr) ?: Material.GRAY_STAINED_GLASS_PANE
+            inventory.setItem(slot, menuConfig.emptyQuest.buildItem(player, fillMaterial))
         }
 
         if (menuConfig.fillEnabled) {
@@ -241,58 +293,73 @@ class QuestCategoryInventory(
     private fun setupButtons() {
         val maxPage = ((filteredQuestsCount - 1) / maxQuestsPerPage).coerceAtLeast(0)
 
-        if (currentPage > 0) {
-            inventory.setItem(previousSlot, menuConfig.buttons.previous.toItemTemplate().buildItem(player, Material.BARRIER))
+        val barrierMaterialStr = menuConfig.defaultBarrierMaterial
+        val barrierMaterial = Material.getMaterial(barrierMaterialStr) ?: Material.BARRIER
+
+        if (currentPage > 0 && menuConfig.buttons.previous.enabled) {
+            inventory.setItem(previousSlot, menuConfig.buttons.previous.toItemTemplate().buildItem(player, barrierMaterial))
         }
 
-        if (currentPage < maxPage) {
-            inventory.setItem(nextSlot, menuConfig.buttons.next.toItemTemplate().buildItem(player, Material.BARRIER))
+        if (currentPage < maxPage && menuConfig.buttons.next.enabled) {
+            inventory.setItem(nextSlot, menuConfig.buttons.next.toItemTemplate().buildItem(player, barrierMaterial))
         }
 
-        val sortTemplate = menuConfig.buttons.sort
-        val sortLore = mutableListOf<Component>()
-        // Keep any custom lore configured for the button
-        sortTemplate.lore.flatMap { it.split("\n") }
-            .map { it.parsePlaceholders(player).asMiniWithoutItalic() }
-            .forEach { sortLore.add(it) }
-        // Separate custom lore from the dynamic sort options
-        if (sortLore.isNotEmpty()) {
-            sortLore.add("".asMiniWithoutItalic())
-        }
-        listOf(
-            SortOption.ALL to menuConfig.buttons.sort.allName,
-            SortOption.COMPLETED to menuConfig.buttons.sort.completedName,
-            SortOption.IN_PROGRESS to menuConfig.buttons.sort.inProgressName,
-            SortOption.NOT_STARTED to menuConfig.buttons.sort.notStartedName
-        ).map { (option, name) ->
-            val sortSettings = menuConfig.buttons.sort
-            val selected = sort == option
-            val rawFormat = if (selected) sortSettings.selectedFormat else sortSettings.unselectedFormat
-            val formatWithName = if (rawFormat.contains("{name}")) rawFormat else "$rawFormat{name}"
-            val formatWithPrefix = if (selected && !formatWithName.contains("{prefix}")) {
-                "{prefix}$formatWithName"
-            } else {
-                formatWithName
+        if (menuConfig.buttons.sort.enabled) {
+            val sortTemplate = menuConfig.buttons.sort
+            val sortLore = mutableListOf<Component>()
+            // Keep any custom lore configured for the button
+            sortTemplate.lore.flatMap { it.split("\n") }
+                .map { it.parsePlaceholders(player).asMiniWithoutItalic() }
+                .forEach { sortLore.add(it) }
+            // Separate custom lore from the dynamic sort options
+            if (sortLore.isNotEmpty()) {
+                sortLore.add("".asMiniWithoutItalic())
             }
-            val resolved = formatWithPrefix
-                .replace("{prefix}", if (selected) sortSettings.selectedPrefix else "")
-                .replace("{name}", name)
-            resolved.parsePlaceholders(player).asMiniWithoutItalic()
-        }.forEach { sortLore.add(it) }
+            listOf(
+                SortOption.ALL to menuConfig.buttons.sort.allName,
+                SortOption.COMPLETED to menuConfig.buttons.sort.completedName,
+                SortOption.IN_PROGRESS to menuConfig.buttons.sort.inProgressName,
+                SortOption.NOT_STARTED to menuConfig.buttons.sort.notStartedName
+            ).map { (option, name) ->
+                val sortSettings = menuConfig.buttons.sort
+                val selected = sort == option
+                val rawFormat = if (selected) sortSettings.selectedFormat else sortSettings.unselectedFormat
+                val formatWithName = if (rawFormat.contains("{name}")) rawFormat else "$rawFormat{name}"
+                val formatWithPrefix = if (selected && !formatWithName.contains("{prefix}")) {
+                    "{prefix}$formatWithName"
+                } else {
+                    formatWithName
+                }
+                val resolved = formatWithPrefix
+                    .replace("{prefix}", if (selected) sortSettings.selectedPrefix else "")
+                    .replace("{name}", name)
+                resolved.parsePlaceholders(player).asMiniWithoutItalic()
+            }.forEach { sortLore.add(it) }
 
-        val sortButton = sortTemplate.toItemTemplate().buildItem(
-            player,
-            Material.BARRIER,
-            loreOverride = sortLore,
-        )
-        inventory.setItem(sortSlot, sortButton)
+            val sortButton = sortTemplate.toItemTemplate().buildItem(
+                player,
+                barrierMaterial,
+                loreOverride = sortLore,
+            )
+            inventory.setItem(sortSlot, sortButton)
+        }
 
-        inventory.setItem(backSlot, menuConfig.buttons.back.toItemTemplate().buildItem(player, Material.BARRIER))
+        if (menuConfig.buttons.back.enabled) {
+            inventory.setItem(backSlot, menuConfig.buttons.back.toItemTemplate().buildItem(player, barrierMaterial))
+        }
+
+        val replayConfig = QuestCodexConfig.replayMenu
+        if (replayConfig.enabled && replayConfig.replayButton.enabled && category.showPrologueButton) {
+            val replayBarrierMaterialStr = replayConfig.defaultBarrierMaterial
+            val replayBarrierMaterial = Material.getMaterial(replayBarrierMaterialStr) ?: Material.ENDER_EYE
+            inventory.setItem(replaySlot, replayConfig.replayButton.toItemTemplate().buildItem(player, replayBarrierMaterial))
+        }
     }
 
     override fun getInventory(): Inventory = inventory
 
     fun questForSlot(slot: Int): QuestEntry? = slotToQuest[slot]
+    fun categoryForSlot(slot: Int): QuestCategory? = slotToCategory[slot]
 
     enum class SortOption {
         ALL, COMPLETED, IN_PROGRESS, NOT_STARTED;

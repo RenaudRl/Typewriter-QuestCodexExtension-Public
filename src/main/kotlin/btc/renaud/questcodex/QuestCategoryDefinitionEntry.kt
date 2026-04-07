@@ -5,6 +5,7 @@ import com.typewritermc.core.extension.annotations.*
 import com.typewritermc.engine.paper.content.modes.custom.HoldingItemContentMode
 import com.typewritermc.engine.paper.entry.Criteria
 import com.typewritermc.engine.paper.entry.ManifestEntry
+import com.typewritermc.engine.paper.utils.item.CustomItem
 import com.typewritermc.engine.paper.utils.item.Item
 
 /**
@@ -38,7 +39,7 @@ class QuestCategoryDefinitionEntry(
     val questSlots: List<String> = emptyList(),
     @Help("Item used as the icon for this category")
     @ContentEditor(HoldingItemContentMode::class)
-    val item: Item = Item.Empty,
+    val item: Item = CustomItem(),
     @Help("Display name used for the category icon in menus")
     @Placeholder
     @Colored
@@ -80,5 +81,12 @@ class QuestCategoryDefinitionEntry(
     @Colored
     @MultiLine
     val categoryLore: String = "",
+    @Help("Link this category to a specific quest. The quest ID can then be used as a parent reference.")
+    val refQuest: String = "",
+    @Help("Whether to show the prologue replay button in this category's menu")
+    val showPrologueButton: Boolean = true,
+    @Help("Whether to show the quest list in this category's menu")
+    val showQuestButton: Boolean = true,
+    @Help("Whether to show sub-categories in this category's menu")
+    val showCategoriesButton: Boolean = true,
 ) : ManifestEntry
-

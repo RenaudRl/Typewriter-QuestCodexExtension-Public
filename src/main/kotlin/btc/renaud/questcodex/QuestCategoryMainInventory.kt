@@ -49,6 +49,7 @@ class QuestCategoryMainInventory(
     private val nextSlot: Int = menuConfig.nextButton.resolveSlot(rows, size)
     private val infoSlot: Int = menuConfig.infoButton.resolveSlot(rows, size)
     private val backSlot: Int = menuConfig.backButton?.resolveSlot(rows, size) ?: -1
+    private val replaySlot: Int = QuestCodexConfig.replayMenu.replayButton.resolveSlot(rows, size)
     private val configuredBackCommands: List<String> = menuConfig.backButtonCommands
     private val hasBackCommand: Boolean = configuredBackCommands.any { it.isNotBlank() }
     private val placementMap: Map<Int, List<CategoryPlacement>>
@@ -117,7 +118,7 @@ class QuestCategoryMainInventory(
 
         val pagePlacements = placementMap[currentPage].orEmpty()
         pagePlacements.forEach { placement ->
-            val item = buildCategoryItem(placement.category)
+            val item = placement.category.buildIcon(player, menuConfig)
             inventory.setItem(placement.slot, item)
             slots[placement.slot] = placement.category
         }
@@ -126,66 +127,28 @@ class QuestCategoryMainInventory(
             inventory.fillWith(player, menuConfig.fill)
         }
 
-        if (currentPage > 0) {
-            inventory.setItem(previousSlot, menuConfig.previousButton.toItemTemplate().buildItem(player, Material.ARROW))
+        val barrierMaterialStr = menuConfig.defaultBarrierMaterial
+        val barrierMaterial = Material.getMaterial(barrierMaterialStr) ?: Material.BARRIER
+        
+        if (currentPage > 0 && menuConfig.previousButton.enabled) {
+            inventory.setItem(previousSlot, menuConfig.previousButton.toItemTemplate().buildItem(player, barrierMaterial))
         }
-        if (currentPage < maxPageIndex) {
-            inventory.setItem(nextSlot, menuConfig.nextButton.toItemTemplate().buildItem(player, Material.ARROW))
+        if (currentPage < maxPageIndex && menuConfig.nextButton.enabled) {
+            inventory.setItem(nextSlot, menuConfig.nextButton.toItemTemplate().buildItem(player, barrierMaterial))
         }
-        inventory.setItem(infoSlot, menuConfig.infoButton.toItemTemplate().buildItem(player, Material.PAPER))
+        if (menuConfig.infoButton.enabled) {
+            inventory.setItem(infoSlot, menuConfig.infoButton.toItemTemplate().buildItem(player, barrierMaterial))
+        }
         val shouldDisplayBackButton =
-            menuConfig.backButton != null && backSlot in 0 until size && (parent != null || hasBackCommand)
+            menuConfig.backButton != null && menuConfig.backButton.enabled && backSlot in 0 until size && (parent != null || hasBackCommand)
         if (shouldDisplayBackButton) {
-            inventory.setItem(backSlot, menuConfig.backButton.toItemTemplate().buildItem(player, Material.BARRIER))
+            inventory.setItem(backSlot, menuConfig.backButton!!.toItemTemplate().buildItem(player, barrierMaterial))
         }
-    }
-
-    private fun buildCategoryItem(category: QuestCategory): ItemStack {
-        val baseItem = when {
-            category.item != Item.Empty -> category.item.build(player)
-            menuConfig.categoryItem != Item.Empty -> menuConfig.categoryItem.build(player)
-            else -> ItemStack(Material.BOOK)
-        }
-        return baseItem.apply {
-            itemMeta = itemMeta.apply {
-                val styleString = if (category.nameColor.isNotBlank()) category.nameColor else menuConfig.categoryNameColor
-                val styleComponent = styleString.parsePlaceholders(player).asMini()
-                val rawIconName = if (category.iconName.isNotBlank()) category.iconName else category.title
-                var nameComponent = rawIconName.parsePlaceholders(player).asMiniWithoutItalic()
-                nameComponent = nameComponent.style(styleComponent.style())
-                if (menuConfig.categoryNameBold) {
-                    nameComponent = nameComponent.decoration(TextDecoration.BOLD, true)
-                }
-                displayName(nameComponent)
-
-                val quests = category.allQuests()
-                val total = quests.size
-                val completed = quests.count { it.questStatus(player) == QuestStatus.COMPLETED }
-                val status = category.categoryStatus(player)
-
-                val loreLines = mutableListOf<String>()
-                val questCountTemplates = category.categoryLoreQuestCountOverride
-                    ?: menuConfig.categoryLoreQuestCount
-                questCountTemplates.forEach { template ->
-                    loreLines += template
-                        .replace("<completed>", completed.toString())
-                        .replace("<total>", total.toString())
-                }
-                if (status != CategoryStatus.BLOCKED) {
-                    val baseLoreTemplates = category.categoryLoreOverride ?: menuConfig.categoryLore
-                    baseLoreTemplates.forEach { loreLines += it }
-                }
-                when (status) {
-                    CategoryStatus.BLOCKED -> loreLines += category.blockedMessage
-                    CategoryStatus.IN_PROGRESS -> loreLines += category.activeMessage
-                    CategoryStatus.COMPLETED -> loreLines += category.completedMessage
-                }
-
-                lore(
-                    loreLines.flatMap { it.split("\n") }
-                        .map { it.parsePlaceholders(player).asMiniWithoutItalic() }
-                )
-            }
+        val replayConfig = QuestCodexConfig.replayMenu
+        if (replayConfig.enabled && replayConfig.replayButton.enabled && (parent == null || parent.showPrologueButton)) {
+            val replayBarrierMaterialStr = replayConfig.defaultBarrierMaterial
+            val replayBarrierMaterial = Material.getMaterial(replayBarrierMaterialStr) ?: Material.ENDER_EYE
+            inventory.setItem(replaySlot, replayConfig.replayButton.toItemTemplate().buildItem(player, replayBarrierMaterial))
         }
     }
 
@@ -198,6 +161,7 @@ class QuestCategoryMainInventory(
     fun backSlot(): Int = backSlot
     fun parent(): QuestCategory? = parent
     fun backCommands(): List<String> = configuredBackCommands
+    fun replaySlot(): Int = replaySlot
 
     private data class CategoryPlacement(val page: Int, val slot: Int, val category: QuestCategory)
 }

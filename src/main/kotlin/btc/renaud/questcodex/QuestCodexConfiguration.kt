@@ -20,6 +20,9 @@ import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import net.kyori.adventure.text.Component
+import com.typewritermc.engine.paper.utils.item.CustomItem
+import com.typewritermc.engine.paper.utils.item.components.ItemMaterialComponent
+import com.typewritermc.engine.paper.entry.entries.ConstVar
 
 /**
  * Template describing how an item should look inside the quest codex menus.
@@ -27,7 +30,7 @@ import net.kyori.adventure.text.Component
 data class ItemTemplate(
     @Help("Item used when rendering the item")
     @ContentEditor(HoldingItemContentMode::class)
-    val item: Item = Item.Empty,
+    val item: Item = CustomItem(listOf(ItemMaterialComponent(ConstVar(Material.AIR)))),
     @Help("Display name of the item")
     @Placeholder
     @Colored
@@ -40,16 +43,36 @@ data class ItemTemplate(
 )
 
 /**
+ * Interface for elements whose inventory slot must be resolved (from explicit slot or column/rows).
+ */
+interface SlotResolvable {
+    val slot: Int?
+    val column: Int
+    
+    fun resolveSlot(rows: Int, inventorySize: Int): Int {
+        val normalizedSlot = slot
+        if (normalizedSlot != null && normalizedSlot in 0 until inventorySize) {
+            return normalizedSlot
+        }
+        val bottomRowStart = (rows - 1).coerceAtLeast(0) * 9
+        val target = bottomRowStart + column.coerceIn(0, 8)
+        return target.coerceIn(0, (inventorySize - 1).coerceAtLeast(0))
+    }
+}
+
+/**
  * Template describing a navigation button inside a menu.
  */
 data class NavigationButtonTemplate(
+    @Help("Whether this button is enabled and visible in the menu")
+    val enabled: Boolean = true,
     @Help("Column used on the last row when no explicit slot is provided")
-    val column: Int = 0,
+    override val column: Int = 0,
     @Help("Explicit slot for the button. Overrides the column when set.")
-    val slot: Int? = null,
+    override val slot: Int? = null,
     @Help("Item used when rendering the button")
     @ContentEditor(HoldingItemContentMode::class)
-    val item: Item = materialItem(Material.ARROW),
+    val item: Item = CustomItem(),
     @Help("Display name of the button")
     @Placeholder
     @Colored
@@ -59,19 +82,21 @@ data class NavigationButtonTemplate(
     @Colored
     @MultiLine
     val lore: List<String> = emptyList(),
-)
+) : SlotResolvable
 
 /**
  * Sort button configuration for the quest menu.
  */
 data class SortButtonSettings(
+    @Help("Whether this button is enabled and visible in the menu")
+    val enabled: Boolean = true,
     @Help("Column used on the last row when no explicit slot is provided")
-    val column: Int = 4,
+    override val column: Int = 4,
     @Help("Explicit slot for the button. Overrides the column when set.")
-    val slot: Int? = null,
+    override val slot: Int? = null,
     @Help("Item used when rendering the button")
     @ContentEditor(HoldingItemContentMode::class)
-    val item: Item = materialItem(Material.COMPARATOR),
+    val item: Item = CustomItem(),
     @Help("Display name of the button")
     @Placeholder
     @Colored
@@ -109,7 +134,7 @@ data class SortButtonSettings(
     @Placeholder
     @Colored
     val notStartedName: String = "Not Started",
-)
+) : SlotResolvable
 
 /**
  * Item templates used for quest buttons in the quest menu.
@@ -117,21 +142,21 @@ data class SortButtonSettings(
 data class QuestButtonSettings(
     @Help("Appearance when a quest is completed")
     val completed: ItemTemplate = ItemTemplate(
-        item = materialItem(Material.ENCHANTED_BOOK),
+        item = CustomItem(listOf(ItemMaterialComponent(ConstVar(Material.EMERALD)))),
         name = "<green>Completed</green>",
-        lore = listOf("<green>✓ Completed</green>"),
+        lore = listOf("<green>\u2713 Completed</green>"),
     ),
     @Help("Appearance when a quest is in progress")
     val inProgress: ItemTemplate = ItemTemplate(
-        item = materialItem(Material.WRITABLE_BOOK),
+        item = CustomItem(listOf(ItemMaterialComponent(ConstVar(Material.CLOCK)))),
         name = "<yellow>In Progress</yellow>",
-        lore = listOf("<yellow>⚡ In Progress</yellow>"),
+        lore = listOf("<yellow>\u26a1 In Progress</yellow>"),
     ),
     @Help("Appearance when a quest has not started")
     val notStarted: ItemTemplate = ItemTemplate(
-        item = materialItem(Material.BOOK),
+        item = CustomItem(listOf(ItemMaterialComponent(ConstVar(Material.BOOK)))),
         name = "<gray>Not Started</gray>",
-        lore = listOf("<gray>○ Not Started</gray>"),
+        lore = listOf("<gray>\u25cb Not Started</gray>"),
     ),
     @Help("Additional lore shown to track a quest")
     @Placeholder
@@ -151,19 +176,19 @@ data class QuestButtonSettings(
 data class QuestMenuButtonSettings(
     val previous: NavigationButtonTemplate = NavigationButtonTemplate(
         column = 0,
-        item = materialItem(Material.ARROW),
+        item = CustomItem(),
         name = "Previous Page",
         lore = listOf("<gray>Go to previous page</gray>"),
     ),
     val next: NavigationButtonTemplate = NavigationButtonTemplate(
         column = 8,
-        item = materialItem(Material.ARROW),
+        item = CustomItem(),
         name = "Next Page",
         lore = listOf("<gray>Go to next page</gray>"),
     ),
     val back: NavigationButtonTemplate = NavigationButtonTemplate(
         column = 7,
-        item = materialItem(Material.BARRIER),
+        item = CustomItem(),
         name = "Back",
         lore = listOf("<gray>Return to categories</gray>"),
     ),
@@ -178,14 +203,18 @@ data class QuestMenuSettings(
     val questsPerRow: Int = 9,
     @Help("Whether to fill empty slots in the quest menu with the configured fill item")
     val fillEnabled: Boolean = true,
-    val fill: ItemTemplate = ItemTemplate(item = materialItem(Material.GRAY_STAINED_GLASS_PANE)),
+    val fill: ItemTemplate = ItemTemplate(item = CustomItem()),
     @Help("Placeholder item used when a quest slot is empty")
     val emptyQuest: ItemTemplate = ItemTemplate(
-        item = materialItem(Material.GRAY_STAINED_GLASS_PANE),
+        item = CustomItem(),
         lore = listOf("<gray>No quests available</gray>"),
     ),
     val buttons: QuestMenuButtonSettings = QuestMenuButtonSettings(),
     val questButtons: QuestButtonSettings = QuestButtonSettings(),
+    @Help("Default material used for filler/placeholder items when no icon is provided")
+    val defaultFillMaterial: String = "GRAY_STAINED_GLASS_PANE",
+    @Help("Default material used for barrier/invalid buttons fallback")
+    val defaultBarrierMaterial: String = "BARRIER",
 )
 
 /**
@@ -202,7 +231,7 @@ data class CategoryMenuSettings(
     val categoriesPerRow: Int = 9,
     @Help("Default item used when a category does not define an icon")
     @ContentEditor(HoldingItemContentMode::class)
-    val categoryItem: Item = materialItem(Material.BOOK),
+    val categoryItem: Item = CustomItem(),
     @Help("Default color or style applied to the category name")
     @Placeholder
     @Colored
@@ -221,22 +250,22 @@ data class CategoryMenuSettings(
     val categoryLore: List<String> = listOf("<gray>Click to view quests</gray>"),
     @Help("Whether to fill empty slots in the category menu with the configured fill item")
     val fillEnabled: Boolean = true,
-    val fill: ItemTemplate = ItemTemplate(item = materialItem(Material.GRAY_STAINED_GLASS_PANE)),
+    val fill: ItemTemplate = ItemTemplate(item = CustomItem()),
     val previousButton: NavigationButtonTemplate = NavigationButtonTemplate(
         column = 0,
-        item = materialItem(Material.ARROW),
+        item = CustomItem(),
         name = "Previous Page",
         lore = listOf("<gray>Go to previous page</gray>"),
     ),
     val nextButton: NavigationButtonTemplate = NavigationButtonTemplate(
         column = 8,
-        item = materialItem(Material.ARROW),
+        item = CustomItem(),
         name = "Next Page",
         lore = listOf("<gray>Go to next page</gray>"),
     ),
     val infoButton: NavigationButtonTemplate = NavigationButtonTemplate(
         column = 4,
-        item = materialItem(Material.PAPER),
+        item = CustomItem(),
         name = "Info",
         lore = listOf("<gray>Completed: %typewriter_total_completed%/%typewriter_total_quests%</gray>"),
     ),
@@ -245,6 +274,10 @@ data class CategoryMenuSettings(
     @Placeholder
     @MultiLine
     val backButtonCommands: List<String> = emptyList(),
+    @Help("Default material used for filler/placeholder items when no icon is provided")
+    val defaultFillMaterial: String = "GRAY_STAINED_GLASS_PANE",
+    @Help("Default material used for barrier/invalid buttons fallback")
+    val defaultBarrierMaterial: String = "BARRIER",
 )
 
 /**
@@ -262,6 +295,40 @@ data class SoundSettings(
     val questUntrack: Sound = defaultSound("minecraft:item.flintandsteel.use"),
 )
 
+/**
+ * Settings for the prologue replay (cinematics) menu.
+ */
+data class PrologueReplaySettings(
+    @Help("Whether the prologue replay system is enabled")
+    val enabled: Boolean = true,
+    @Help("Title of the cinema replay menu")
+    @Placeholder
+    @Colored
+    val title: String = "Cinematic Replay",
+    @Help("Rows of the cinema replay menu")
+    val rows: Int = 3,
+    @Help("Exact slots (single index or ranges like 2-10) used to display cinematic entries")
+    val slots: List<String> = emptyList(),
+    @Help("Button template used to access the replay menu from other menus")
+    val replayButton: NavigationButtonTemplate = NavigationButtonTemplate(
+        column = 4,
+        item = CustomItem(),
+        name = "Prologue Replay",
+        lore = listOf("<gray>Click to replay cinematics</gray>"),
+    ),
+    @Help("Navigation button to return to the parent menu")
+    val backButton: NavigationButtonTemplate = NavigationButtonTemplate(
+        column = 8,
+        item = CustomItem(),
+        name = "Back",
+        lore = listOf("<gray>Return to parent</gray>"),
+    ),
+    @Help("Default material used for filler/placeholder items when no icon is provided")
+    val defaultFillMaterial: String = "GRAY_STAINED_GLASS_PANE",
+    @Help("Default material used for barrier/invalid buttons fallback")
+    val defaultBarrierMaterial: String = "BARRIER",
+)
+
 /** Default configuration used when no entry overrides it. */
 object QuestCodexDefaults {
     val mainMenu: CategoryMenuSettings = CategoryMenuSettings()
@@ -269,13 +336,14 @@ object QuestCodexDefaults {
         title = "<category>",
         backButton = NavigationButtonTemplate(
             column = 7,
-            item = materialItem(Material.BARRIER),
+            item = CustomItem(),
             name = "Back",
             lore = listOf("<gray>Return to parent</gray>"),
         ),
     )
     val questMenu: QuestMenuSettings = QuestMenuSettings()
     val sounds: SoundSettings = SoundSettings()
+    val replayMenu: PrologueReplaySettings = PrologueReplaySettings()
 
     fun settingsEntry(): QuestCodexSettingsEntry = QuestCodexSettingsEntry(
         id = "quest_codex_settings_defaults",
@@ -284,6 +352,7 @@ object QuestCodexDefaults {
         subMenu = subMenu,
         questMenu = questMenu,
         sounds = sounds,
+        replayMenu = replayMenu,
     )
 }
 
@@ -297,6 +366,8 @@ object QuestCodexConfig {
         private set
     var sounds: SoundSettings = QuestCodexDefaults.sounds
         private set
+    var replayMenu: PrologueReplaySettings = QuestCodexDefaults.replayMenu
+        private set
 
     /** Reset configuration to default values. */
     fun reset() {
@@ -304,6 +375,7 @@ object QuestCodexConfig {
         subMenu = QuestCodexDefaults.subMenu
         questMenu = QuestCodexDefaults.questMenu
         sounds = QuestCodexDefaults.sounds
+        replayMenu = QuestCodexDefaults.replayMenu
     }
 
     /** Apply settings from a Typewriter entry. */
@@ -312,6 +384,7 @@ object QuestCodexConfig {
         subMenu = entry.subMenu
         questMenu = entry.questMenu
         sounds = entry.sounds
+        replayMenu = entry.replayMenu
     }
 }
 
@@ -331,27 +404,8 @@ class QuestCodexSettingsEntry(
     val subMenu: CategoryMenuSettings = QuestCodexDefaults.subMenu,
     val questMenu: QuestMenuSettings = QuestCodexDefaults.questMenu,
     val sounds: SoundSettings = QuestCodexDefaults.sounds,
+    val replayMenu: PrologueReplaySettings = QuestCodexDefaults.replayMenu,
 ) : ManifestEntry
-
-fun NavigationButtonTemplate.resolveSlot(rows: Int, inventorySize: Int): Int {
-    val normalizedSlot = slot
-    if (normalizedSlot != null && normalizedSlot in 0 until inventorySize) {
-        return normalizedSlot
-    }
-    val bottomRowStart = (rows - 1).coerceAtLeast(0) * 9
-    val target = bottomRowStart + column.coerceIn(0, 8)
-    return target.coerceIn(0, (inventorySize - 1).coerceAtLeast(0))
-}
-
-fun SortButtonSettings.resolveSlot(rows: Int, inventorySize: Int): Int {
-    val normalizedSlot = slot
-    if (normalizedSlot != null && normalizedSlot in 0 until inventorySize) {
-        return normalizedSlot
-    }
-    val bottomRowStart = (rows - 1).coerceAtLeast(0) * 9
-    val target = bottomRowStart + column.coerceIn(0, 8)
-    return target.coerceIn(0, (inventorySize - 1).coerceAtLeast(0))
-}
 
 fun NavigationButtonTemplate.toItemTemplate(): ItemTemplate =
     ItemTemplate(item = item, name = name, lore = lore)
@@ -359,8 +413,11 @@ fun NavigationButtonTemplate.toItemTemplate(): ItemTemplate =
 fun SortButtonSettings.toItemTemplate(): ItemTemplate =
     ItemTemplate(item = item, name = name, lore = lore)
 
+fun Item.isEffectivelyEmpty(): Boolean =
+    this == Item.Empty || (this is CustomItem && (components.filterIsInstance<ItemMaterialComponent>().firstOrNull()?.material ?: Material.AIR) == Material.AIR)
+
 fun ItemTemplate.baseItem(player: Player, fallbackMaterial: Material = Material.GRAY_STAINED_GLASS_PANE): ItemStack =
-    if (item != Item.Empty) item.build(player) else ItemStack(fallbackMaterial)
+    if (!item.isEffectivelyEmpty()) item.build(player) else ItemStack(fallbackMaterial)
 
 fun ItemTemplate.buildItem(
     player: Player,
@@ -386,7 +443,4 @@ fun ItemTemplate.buildItem(
     return base
 }
 
-private fun materialItem(material: Material): Item = ItemStack(material).toItem()
-
 private fun defaultSound(id: String): Sound = Sound(DefaultSoundId(id))
-

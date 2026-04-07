@@ -22,6 +22,37 @@ fun CommandTree.questCodexCommand() = literal("questcodex") {
         player.playCodexSound(codexSoundMenuOpen)
     }
 
+    // /questcodex replay [category]
+    literal("replay") {
+        executes {
+            val player = sender as? Player
+            if (player == null) {
+                sender.msg("<red>Only players can open replay menus")
+                return@executes
+            }
+            player.openInventory(PrologueReplayInventory(player).getInventory())
+            player.playCodexSound(codexSoundMenuOpen)
+        }
+
+        string("category") { category ->
+            executes {
+                val player = sender as? Player
+                if (player == null) {
+                    sender.msg("<red>Only players can open replay menus")
+                    return@executes
+                }
+                val name = category()
+                val replayCategory = PrologueReplayRegistry.find(name)
+                if (replayCategory == null) {
+                    sender.msg("<red>Unknown replay category: $name")
+                    return@executes
+                }
+                player.openInventory(PrologueReplayInventory(player, replayCategory).getInventory())
+                player.playCodexSound(codexSoundMenuOpen)
+            }
+        }
+    }
+
     // /questcodex <category> [sort]
     string("category") { category ->
         executes {
@@ -38,12 +69,7 @@ fun CommandTree.questCodexCommand() = literal("questcodex") {
                 return@executes
             }
 
-            val inventory = if (questCategory.subCategories.isNotEmpty()) {
-                QuestCategoryMainInventory(player, questCategory).getInventory()
-            } else {
-                QuestCategoryInventory(player, questCategory).getInventory()
-            }
-            player.openInventory(inventory)
+            openQuestCodexMenu(player, questCategory)
             player.playCodexSound(codexSoundMenuOpen)
         }
 
@@ -69,12 +95,7 @@ fun CommandTree.questCodexCommand() = literal("questcodex") {
                     return@executes
                 }
 
-                val inventory = if (questCategory.subCategories.isNotEmpty()) {
-                    QuestCategoryMainInventory(player, questCategory).getInventory()
-                } else {
-                    QuestCategoryInventory(player, questCategory, option).getInventory()
-                }
-                player.openInventory(inventory)
+                openQuestCodexMenu(player, questCategory, option)
                 player.playCodexSound(codexSoundMenuOpen)
             }
         }

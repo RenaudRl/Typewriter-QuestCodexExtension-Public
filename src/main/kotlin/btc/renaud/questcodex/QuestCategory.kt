@@ -8,6 +8,19 @@ import com.typewritermc.engine.paper.utils.item.Item
 import com.typewritermc.quest.entries.QuestEntry
 import com.typewritermc.quest.QuestStatus
 import org.bukkit.entity.Player
+import org.bukkit.inventory.ItemStack
+import btc.renaud.questcodex.QuestCodexConfig
+import btc.renaud.questcodex.CategoryMenuSettings
+import btc.renaud.questcodex.CategoryStatus
+import btc.renaud.questcodex.categoryStatus
+import btc.renaud.questcodex.allQuests
+import com.typewritermc.engine.paper.utils.asMini
+import com.typewritermc.engine.paper.extensions.placeholderapi.parsePlaceholders
+import btc.renaud.questcodex.asMiniWithoutItalic
+import net.kyori.adventure.text.format.TextDecoration
+import btc.renaud.questcodex.isEffectivelyEmpty
+import org.bukkit.Material
+import com.typewritermc.engine.paper.utils.item.CustomItem
 
 /**
  * Represents a collection of quests grouped under a single category.
@@ -24,7 +37,7 @@ data class QuestCategory(
     /** Number of rows shown in the menu (3-6). */
     var rows: Int = 3,
     /** Item used as icon for this category. */
-    var item: Item = Item.Empty,
+    var item: Item = CustomItem(),
     /** Optional name color/style override for main menu. */
     var nameColor: String = "",
     /** Optional explicit slot of this category inside the menu. */
@@ -66,12 +79,70 @@ data class QuestCategory(
     var categoryLoreQuestCountOverride: List<String>? = null,
     /** Optional per-category lore override. */
     var categoryLoreOverride: List<String>? = null,
+    /** Link to a specific quest. */
+    var refQuest: String = "",
+    /** Whether to show the prologue replay button. */
+    var showPrologueButton: Boolean = true,
+    /** Whether to show the quest list. */
+    var showQuestButton: Boolean = true,
+    /** Whether to show sub-categories. */
+    var showCategoriesButton: Boolean = true,
 )
 
+fun QuestCategory.buildIcon(player: Player, menuConfig: CategoryMenuSettings): ItemStack {
+    val fillMaterialStr = menuConfig.defaultFillMaterial
+    val fillMaterial = Material.getMaterial(fillMaterialStr) ?: Material.BOOK
+    val baseItem = when {
+        !item.isEffectivelyEmpty() -> item.build(player)
+        !menuConfig.categoryItem.isEffectivelyEmpty() -> menuConfig.categoryItem.build(player)
+        else -> ItemStack(fillMaterial)
+    }
+    val meta = baseItem.itemMeta ?: return baseItem
+    val styleString = if (nameColor.isNotBlank()) nameColor else menuConfig.categoryNameColor
+    val styleComponent = styleString.parsePlaceholders(player).asMini()
+    val rawIconName = if (iconName.isNotBlank()) iconName else title
+    var nameComponent = rawIconName.parsePlaceholders(player).asMiniWithoutItalic()
+    nameComponent = nameComponent.style(styleComponent.style())
+    if (menuConfig.categoryNameBold) {
+        nameComponent = nameComponent.decoration(TextDecoration.BOLD, true)
+    }
+    meta.displayName(nameComponent)
+
+    val quests = allQuests()
+    val total = quests.size
+    val completed = quests.count { it.questStatus(player) == QuestStatus.COMPLETED }
+    val status = categoryStatus(player)
+
+    val loreLines = mutableListOf<String>()
+    val questCountTemplates = categoryLoreQuestCountOverride
+        ?: menuConfig.categoryLoreQuestCount
+    questCountTemplates.forEach { template ->
+        loreLines += template
+            .replace("<completed>", completed.toString())
+            .replace("<total>", total.toString())
+    }
+    if (status != CategoryStatus.BLOCKED) {
+        val baseLoreTemplates = categoryLoreOverride ?: menuConfig.categoryLore
+        baseLoreTemplates.forEach { loreLines += it }
+    }
+    when (status) {
+        CategoryStatus.BLOCKED -> loreLines += blockedMessage
+        CategoryStatus.IN_PROGRESS -> loreLines += activeMessage
+        CategoryStatus.COMPLETED -> loreLines += completedMessage
+    }
+
+    meta.lore(
+        loreLines.flatMap { it.split("\n") }
+            .map { it.parsePlaceholders(player).asMiniWithoutItalic() }
+    )
+    baseItem.itemMeta = meta
+    return baseItem
+}
+
 data class QuestItemOverrides(
-    val notStarted: Item = Item.Empty,
-    val inProgress: Item = Item.Empty,
-    val completed: Item = Item.Empty,
+    val notStarted: Item = CustomItem(),
+    val inProgress: Item = CustomItem(),
+    val completed: Item = CustomItem(),
 ) {
     fun hasOverrides(): Boolean =
         notStarted != Item.Empty || inProgress != Item.Empty || completed != Item.Empty
@@ -162,7 +233,7 @@ object QuestCategoryRegistry {
         name: String,
         title: String = name,
         rows: Int = 3,
-        item: Item = Item.Empty,
+        item: Item = CustomItem(),
         nameColor: String = "",
         parent: String = "",
         order: Int = 0,
@@ -178,13 +249,17 @@ object QuestCategoryRegistry {
         iconName: String = "",
         categoryLoreQuestCount: List<String>? = null,
         categoryLore: List<String>? = null,
+        refQuest: String = "",
+        showPrologueButton: Boolean = true,
+        showQuestButton: Boolean = true,
+        showCategoriesButton: Boolean = true,
     ): QuestCategory {
         val key = name.lowercase()
         val category = categories.getOrPut(key) { QuestCategory(name) }
         category.title = title
         category.iconName = iconName.takeIf { it.isNotBlank() } ?: title
         category.rows = rows.coerceIn(3, 6)
-        if (item != Item.Empty) {
+        if (!item.isEffectivelyEmpty()) {
             category.item = item
         }
         if (nameColor.isNotBlank()) {
@@ -197,7 +272,7 @@ object QuestCategoryRegistry {
             category.questSlots = questSlots.filter { it >= 0 }
         }
         if (parent.isNotBlank()) {
-            val parentCategory = ensure(parent)
+            val parentCategory = findByIdOrRefQuest(parent) ?: ensure(parent)
             category.parent = parentCategory
             if (!parentCategory.subCategories.contains(category)) {
                 parentCategory.subCategories.add(category)
@@ -213,7 +288,17 @@ object QuestCategoryRegistry {
         category.hideWhenLocked = hideWhenLocked
         category.categoryLoreQuestCountOverride = categoryLoreQuestCount
         category.categoryLoreOverride = categoryLore
+        category.refQuest = refQuest
+        category.showPrologueButton = showPrologueButton
+        category.showQuestButton = showQuestButton
+        category.showCategoriesButton = showCategoriesButton
         return category
+    }
+
+    private fun findByIdOrRefQuest(id: String): QuestCategory? {
+        val key = id.lowercase()
+        categories[key]?.let { return it }
+        return categories.values.find { it.refQuest.equals(id, ignoreCase = true) }
     }
 
     private fun ensure(name: String): QuestCategory {
@@ -239,7 +324,7 @@ object QuestCategoryRegistry {
         additionalLore: QuestAdditionalLore? = null,
     ) {
         val category = ensure(categoryName)
-        if (!category.quests.contains(questRef)) {
+        if (questRef.id.isNotBlank() && !category.quests.contains(questRef)) {
             category.quests.add(questRef)
         }
         if (order != null) {
@@ -276,6 +361,7 @@ object QuestCategoryRegistry {
      * Set a restriction message for a quest within a category.
      */
     fun setRestriction(categoryName: String, quest: Ref<QuestEntry>, message: List<String>) {
+        if (quest.id.isBlank()) return
         val category = ensure(categoryName)
         quest.get()?.let { q ->
             category.restrictions[q.id] = message
@@ -314,4 +400,50 @@ fun QuestCategory.categoryStatus(player: Player): CategoryStatus = when {
     activeCriteria.matches(player) -> CategoryStatus.IN_PROGRESS
     else -> CategoryStatus.BLOCKED
 }
+
+/**
+ * Registry for cinematic replay categories.
+ */
+object PrologueReplayRegistry {
+    private val categories: MutableMap<String, PrologueReplayCategory> = mutableMapOf()
+
+    fun register(
+        id: String,
+        title: String,
+        item: Item,
+        order: Int,
+        slot: Int,
+        questCategory: String,
+        entries: List<PrologueReplayEntryData>
+    ) {
+        categories[id.lowercase()] = PrologueReplayCategory(
+            id = id,
+            title = title,
+            item = item,
+            order = order,
+            slot = slot,
+            questCategory = questCategory,
+            entries = entries
+        )
+    }
+
+    fun find(id: String): PrologueReplayCategory? = categories[id.lowercase()]
+
+    fun findByQuestCategory(categoryName: String): PrologueReplayCategory? {
+        val key = categoryName.lowercase()
+        return categories.values.find { it.questCategory.lowercase() == key }
+    }
+
+    fun all(): Collection<PrologueReplayCategory> = categories.values.sortedBy { it.order }
+}
+
+data class PrologueReplayCategory(
+    val id: String,
+    val title: String,
+    val item: Item,
+    val order: Int,
+    val slot: Int,
+    val questCategory: String,
+    val entries: List<PrologueReplayEntryData>
+)
 

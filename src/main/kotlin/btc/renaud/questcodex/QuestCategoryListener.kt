@@ -67,7 +67,7 @@ class QuestCategoryListener : Listener {
 
                     when (event.rawSlot) {
                         holder.previousSlot -> {
-                            if (holder.currentPage > 0) {
+                            if (holder.menuConfig.buttons.previous.enabled && holder.currentPage > 0) {
                                 holder.loadPage(holder.currentPage - 1)
                                 player.openInventory(holder.getInventory())
                                 player.playCodexSound(codexSoundButtonPrevious)
@@ -75,32 +75,41 @@ class QuestCategoryListener : Listener {
                             }
                         }
                         holder.nextSlot -> {
-                            val maxPage = (holder.filteredQuestsCount - 1) / holder.maxQuestsPerPage
-                            if (holder.currentPage < maxPage) {
-                                holder.loadPage(holder.currentPage + 1)
-                                player.openInventory(holder.getInventory())
-                                player.playCodexSound(codexSoundButtonNext)
-                                player.playCodexSound(codexSoundMenuSwitch)
+                            if (holder.menuConfig.buttons.next.enabled) {
+                                val maxPage = (holder.filteredQuestsCount - 1) / holder.maxQuestsPerPage
+                                if (holder.currentPage < maxPage) {
+                                    holder.loadPage(holder.currentPage + 1)
+                                    player.openInventory(holder.getInventory())
+                                    player.playCodexSound(codexSoundButtonNext)
+                                    player.playCodexSound(codexSoundMenuSwitch)
+                                }
                             }
                         }
                         holder.sortSlot -> {
-                            holder.sort = holder.sort.next()
-                            holder.loadPage(0)
-                            player.openInventory(holder.getInventory())
-                            player.playCodexSound(codexSoundButtonSort)
-                            player.playCodexSound(codexSoundMenuSwitch)
+                            if (holder.menuConfig.buttons.sort.enabled) {
+                                holder.sort = holder.sort.next()
+                                holder.loadPage(0)
+                                player.openInventory(holder.getInventory())
+                                player.playCodexSound(codexSoundButtonSort)
+                                player.playCodexSound(codexSoundMenuSwitch)
+                            }
                         }
                         holder.backSlot -> {
-                            val parent = holder.category.parent
-                            openQuestCodexMenu(player, parent)
-                            player.playCodexSound(codexSoundButtonBack)
-                            player.playCodexSound(codexSoundMenuSwitch)
+                            if (holder.menuConfig.buttons.back.enabled) {
+                                val parent = holder.category.parent
+                                openQuestCodexMenu(player, parent)
+                                player.playCodexSound(codexSoundButtonBack)
+                                player.playCodexSound(codexSoundMenuSwitch)
+                            }
                         }
                         holder.replaySlot -> {
-                            val replayCategory = PrologueReplayRegistry.findByQuestCategory(holder.category.name)
-                            player.openInventory(PrologueReplayInventory(player, replayCategory).getInventory())
-                            player.playCodexSound(codexSoundButtonCategory)
-                            player.playCodexSound(codexSoundMenuOpen)
+                            val replayConfig = QuestCodexConfig.replayMenu
+                            if (replayConfig.enabled && replayConfig.replayButton.enabled) {
+                                val replayCategory = PrologueReplayRegistry.findByQuestCategory(holder.category.name)
+                                player.openInventory(PrologueReplayInventory(player, replayCategory).getInventory())
+                                player.playCodexSound(codexSoundButtonCategory)
+                                player.playCodexSound(codexSoundMenuOpen)
+                            }
                         }
                         else -> {
                             val quest = holder.questForSlot(event.rawSlot)
@@ -157,7 +166,7 @@ class QuestCategoryListener : Listener {
 
                     when (event.rawSlot) {
                         holder.previousSlot() -> {
-                            if (holder.currentPage > 0) {
+                            if (holder.menuConfig.previousButton.enabled && holder.currentPage > 0) {
                                 holder.loadPage(holder.currentPage - 1)
                                 player.openInventory(holder.getInventory())
                                 player.playCodexSound(codexSoundButtonPrevious)
@@ -165,7 +174,7 @@ class QuestCategoryListener : Listener {
                             }
                         }
                         holder.nextSlot() -> {
-                            if (holder.currentPage < holder.maxPage()) {
+                            if (holder.menuConfig.nextButton.enabled && holder.currentPage < holder.maxPage()) {
                                 holder.loadPage(holder.currentPage + 1)
                                 player.openInventory(holder.getInventory())
                                 player.playCodexSound(codexSoundButtonNext)
@@ -173,37 +182,42 @@ class QuestCategoryListener : Listener {
                             }
                         }
                         holder.backSlot() -> {
-                            val commands = holder.backCommands()
-                                .mapNotNull { it.trim().takeIf(String::isNotEmpty) }
-                            if (commands.isNotEmpty()) {
-                                player.closeInventory()
-                                commands.forEach { rawCommand ->
-                                    val parsed = rawCommand.parsePlaceholders(player)
-                                    val normalized = parsed.removePrefix("/").trim()
-                                    if (normalized.isEmpty()) return@forEach
-                                    val executed = player.performCommand(normalized)
-                                    if (!executed) {
-                                        plugin.logger.log(
-                                            Level.WARNING,
-                                            "[QuestCodex] Failed to execute back button command '$normalized' for player ${player.name}."
-                                        )
+                            if (holder.menuConfig.backButton?.enabled == true) {
+                                val commands = holder.backCommands()
+                                    .mapNotNull { it.trim().takeIf(String::isNotEmpty) }
+                                if (commands.isNotEmpty()) {
+                                    player.closeInventory()
+                                    commands.forEach { rawCommand ->
+                                        val parsed = rawCommand.parsePlaceholders(player)
+                                        val normalized = parsed.removePrefix("/").trim()
+                                        if (normalized.isEmpty()) return@forEach
+                                        val executed = player.performCommand(normalized)
+                                        if (!executed) {
+                                            plugin.logger.log(
+                                                Level.WARNING,
+                                                "[QuestCodex] Failed to execute back button command '$normalized' for player ${player.name}."
+                                            )
+                                        }
                                     }
+                                    player.playCodexSound(codexSoundButtonBack)
+                                    player.playCodexSound(codexSoundMenuSwitch)
+                                    return
                                 }
+                                val parent = holder.parent()
+                                openQuestCodexMenu(player, parent?.parent)
                                 player.playCodexSound(codexSoundButtonBack)
                                 player.playCodexSound(codexSoundMenuSwitch)
-                                return
                             }
-                            val parent = holder.parent()
-                            openQuestCodexMenu(player, parent?.parent)
-                            player.playCodexSound(codexSoundButtonBack)
-                            player.playCodexSound(codexSoundMenuSwitch)
                         }
                         holder.replaySlot() -> {
-                            val parent = holder.parent()
-                            val replayCategory = parent?.let { PrologueReplayRegistry.findByQuestCategory(it.name) }
-                            player.openInventory(PrologueReplayInventory(player, replayCategory).getInventory())
-                            player.playCodexSound(codexSoundButtonCategory)
-                            player.playCodexSound(codexSoundMenuOpen)
+                            val replayConfig = QuestCodexConfig.replayMenu
+                            if (replayConfig.enabled && replayConfig.replayButton.enabled) {
+                                val parent = holder.parent()
+                                val replayCategory = parent?.let { PrologueReplayRegistry.findByQuestCategory(it.name) }
+                                player.openInventory(PrologueReplayInventory(player, replayCategory).getInventory())
+                                player.playCodexSound(codexSoundButtonCategory)
+                                player.playCodexSound(codexSoundMenuOpen)
+                            }
                         }
                         holder.infoSlot() -> {
                             // No action for info button

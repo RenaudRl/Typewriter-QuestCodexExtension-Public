@@ -23,7 +23,7 @@ class QuestCategoryMainInventory(
             .sortedWith(compareBy({ if (it.order == 0) Int.MAX_VALUE else it.order }, { it.title }))
             .filter { !(it.hideWhenLocked && it.categoryStatus(player) == CategoryStatus.BLOCKED) }
     private val isSubMenu: Boolean = parent != null
-    private val menuConfig = if (isSubMenu) QuestCodexConfig.subMenu else QuestCodexConfig.mainMenu
+    internal val menuConfig = if (isSubMenu) QuestCodexConfig.subMenu else QuestCodexConfig.mainMenu
     private val rows: Int = menuConfig.rows.coerceIn(2, 6)
     private val categoriesPerRow: Int = menuConfig.categoriesPerRow.coerceIn(1, 9)
     private val size: Int = rows * 9

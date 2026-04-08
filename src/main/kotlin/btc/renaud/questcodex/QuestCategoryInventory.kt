@@ -43,7 +43,7 @@ class QuestCategoryInventory(
     var sort: SortOption = SortOption.ALL,
 ) : InventoryHolder {
 
-    private val menuConfig = QuestCodexConfig.questMenu
+    internal val menuConfig = QuestCodexConfig.questMenu
     private val inventory: Inventory = server.createInventory(
         this,
         category.rows * 9,

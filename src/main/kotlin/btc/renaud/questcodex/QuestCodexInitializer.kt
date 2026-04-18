@@ -4,7 +4,6 @@ import com.typewritermc.core.entries.Query
 import com.typewritermc.core.extension.Initializable
 import com.typewritermc.core.extension.annotations.Singleton
 import com.typewritermc.engine.paper.plugin
-import com.typewritermc.engine.paper.utils.FoliaScheduler
 import org.bukkit.Bukkit
 import org.bukkit.event.inventory.InventoryClickEvent
 import java.util.logging.Level

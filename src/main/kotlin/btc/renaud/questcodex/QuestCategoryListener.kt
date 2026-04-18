@@ -225,6 +225,7 @@ class QuestCategoryListener : Listener {
                         else -> {
                             val category = holder.slots[event.rawSlot] ?: return
                             if (category.categoryStatus(player) == CategoryStatus.BLOCKED) {
+                                player.playSound(player.location, org.bukkit.Sound.ENTITY_VILLAGER_NO, 1f, 1f)
                                 return
                             }
                             

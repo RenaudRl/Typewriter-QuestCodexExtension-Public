@@ -395,10 +395,10 @@ enum class CategoryStatus {
     COMPLETED,
 }
 
-fun QuestCategory.categoryStatus(player: Player): CategoryStatus = when {
-    completedCriteria.matches(player) -> CategoryStatus.COMPLETED
-    activeCriteria.matches(player) -> CategoryStatus.IN_PROGRESS
-    else -> CategoryStatus.BLOCKED
+fun QuestCategory.categoryStatus(player: Player): CategoryStatus {
+    if (completedCriteria.isNotEmpty() && completedCriteria.matches(player)) return CategoryStatus.COMPLETED
+    if (activeCriteria.isNotEmpty() && !activeCriteria.matches(player)) return CategoryStatus.BLOCKED
+    return CategoryStatus.IN_PROGRESS
 }
 
 /**

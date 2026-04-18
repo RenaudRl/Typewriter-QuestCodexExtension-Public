@@ -151,12 +151,12 @@ class QuestCategoryInventory(
             val ref = quest.ref()
             val status = view.status
             val displayOverride = category.questDisplays[quest.id]?.state(status)
+            val objectiveOrder = quest.children.descendants(ObjectiveEntry::class).mapIndexed { index, objectiveRef ->
+                objectiveRef.id to index
+            }.toMap()
             val objectives: List<ObjectiveEntry> = player.questShowingObjectives(ref)
-                .filter { obj ->
-                    if (QuestPlusIntegration.isHidden(obj, player)) {
-                        false
-                    } else true
-                }
+                .filter { obj -> !QuestPlusIntegration.isHidden(obj, player) }
+                .sortedBy { objectiveOrder[it.id] ?: Int.MAX_VALUE }
                 .toList()
             val description = quest.children.descendants(LinesEntry::class).mapNotNull { it.get() }
 

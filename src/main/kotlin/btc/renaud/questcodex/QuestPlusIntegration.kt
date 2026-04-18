@@ -26,17 +26,24 @@ object QuestPlusIntegration {
     }
 
     /**
-     * Checks if an objective should be hidden based on HidableObjective.hideObjective property.
+     * Checks if an objective should be hidden based on a 'hideObjective' property.
+     * In the Codex, hideObjective = true means ALWAYS hidden, regardless of tracking state.
+     * The tracking condition only applies to the HUD/action-bar display (handled in QuestPlus).
+     * Uses reflection to remain compatible with various extensions (QuestPlus, MythicMobs, etc.)
      */
     fun isHidden(objective: ObjectiveEntry, player: Player): Boolean {
-        if (hidableObjectiveClass == null || !hidableObjectiveClass.isInstance(objective)) return false
         
         return try {
-            val getHideObjectiveMethod = hidableObjectiveClass.getMethod("getHideObjective")
-            val varInstance = getHideObjectiveMethod.invoke(objective)
+            // Find the getHideObjective() method which Kotlin generates for val hideObjective
+            val method = objective.javaClass.methods.find { it.name == "getHideObjective" } ?: return false
+            val varInstance = method.invoke(objective)
+            
             // Var<Boolean> has a get(player) method
             val getMethod = varInstance.javaClass.getMethod("get", Player::class.java)
-            getMethod.invoke(varInstance, player) as Boolean
+            val isHidden = getMethod.invoke(varInstance, player) as? Boolean ?: false
+            
+            // In the Codex: hide if flag is true, regardless of quest tracking state
+            isHidden
         } catch (e: Exception) {
             false
         }

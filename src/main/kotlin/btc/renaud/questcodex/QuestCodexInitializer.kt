@@ -4,6 +4,7 @@ import com.typewritermc.core.entries.Query
 import com.typewritermc.core.extension.Initializable
 import com.typewritermc.core.extension.annotations.Singleton
 import com.typewritermc.engine.paper.plugin
+import com.typewritermc.engine.paper.utils.FoliaScheduler
 import org.bukkit.Bukkit
 import org.bukkit.event.inventory.InventoryClickEvent
 import java.util.logging.Level
@@ -18,7 +19,7 @@ import kotlin.reflect.KClass
 @Singleton
 object QuestCodexInitializer : Initializable {
     private val listener = QuestCategoryListener()
-    private var refreshTask: org.bukkit.scheduler.BukkitTask? = null
+    private var refreshTask: FoliaScheduler.TaskHandle? = null
 
     override suspend fun initialize() {
         val manager = Bukkit.getPluginManager()
@@ -195,7 +196,7 @@ object QuestCodexInitializer : Initializable {
         }
 
         // Periodic refresh for open Codex inventories to avoid manual reloads
-        refreshTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
+        refreshTask = FoliaScheduler.runAtFixedRate(40L, 40L) {
             Bukkit.getOnlinePlayers().forEach { player ->
                 val holder = player.openInventory.topInventory.holder
                 if (holder is QuestCategoryInventory) {
@@ -204,7 +205,7 @@ object QuestCodexInitializer : Initializable {
                     holder.loadPage(holder.currentPage)
                 }
             }
-        }, 40L, 40L)
+        }
     }
 
     override suspend fun shutdown() {

@@ -400,11 +400,19 @@ object QuestCodexConfig {
 class QuestCodexSettingsEntry(
     override val id: String = "",
     override val name: String = "",
-    val mainMenu: CategoryMenuSettings = QuestCodexDefaults.mainMenu,
-    val subMenu: CategoryMenuSettings = QuestCodexDefaults.subMenu,
-    val questMenu: QuestMenuSettings = QuestCodexDefaults.questMenu,
-    val sounds: SoundSettings = QuestCodexDefaults.sounds,
-    val replayMenu: PrologueReplaySettings = QuestCodexDefaults.replayMenu,
+    val mainMenu: CategoryMenuSettings = CategoryMenuSettings(),
+    val subMenu: CategoryMenuSettings = CategoryMenuSettings(
+        title = "<category>",
+        backButton = NavigationButtonTemplate(
+            column = 7,
+            item = CustomItem(),
+            name = "Back",
+            lore = listOf("<gray>Return to parent</gray>"),
+        ),
+    ),
+    val questMenu: QuestMenuSettings = QuestMenuSettings(),
+    val sounds: SoundSettings = SoundSettings(),
+    val replayMenu: PrologueReplaySettings = PrologueReplaySettings(),
 ) : ManifestEntry
 
 fun NavigationButtonTemplate.toItemTemplate(): ItemTemplate =

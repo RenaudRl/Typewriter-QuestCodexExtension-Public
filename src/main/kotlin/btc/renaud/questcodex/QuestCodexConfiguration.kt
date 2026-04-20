@@ -264,7 +264,7 @@ data class CategoryMenuSettings(
         lore = listOf("<gray>Go to next page</gray>"),
     ),
     val infoButton: NavigationButtonTemplate = NavigationButtonTemplate(
-        column = 4,
+        column = 3,
         item = CustomItem(),
         name = "Info",
         lore = listOf("<gray>Completed: %typewriter_total_completed%/%typewriter_total_quests%</gray>"),
@@ -311,7 +311,7 @@ data class PrologueReplaySettings(
     val slots: List<String> = emptyList(),
     @Help("Button template used to access the replay menu from other menus")
     val replayButton: NavigationButtonTemplate = NavigationButtonTemplate(
-        column = 4,
+        column = 5,
         item = CustomItem(),
         name = "Prologue Replay",
         lore = listOf("<gray>Click to replay cinematics</gray>"),

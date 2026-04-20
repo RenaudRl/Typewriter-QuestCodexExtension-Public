@@ -56,7 +56,7 @@ object QuestCodexInitializer : Initializable {
                 nameColor = it.nameColor,
                 parent = it.parent,
                 order = it.order,
-                slot = it.slot.takeIf { slot -> slot >= 0 },
+                slot = it.slot.takeIf { slot -> slot >= -1 },
                 questSlots = parseSlots(it.questSlots, "category ${it.category}"),
                 activeCriteria = it.activeCriteria,
                 completedCriteria = it.completedCriteria,

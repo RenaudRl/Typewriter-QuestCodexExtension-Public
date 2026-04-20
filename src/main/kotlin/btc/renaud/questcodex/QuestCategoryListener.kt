@@ -66,50 +66,42 @@ class QuestCategoryListener : Listener {
                     if (event.clickedInventory != event.view.topInventory) return
 
                     when (event.rawSlot) {
-                        holder.previousSlot -> {
-                            if (holder.menuConfig.buttons.previous.enabled && holder.currentPage > 0) {
-                                holder.loadPage(holder.currentPage - 1)
-                                player.openInventory(holder.getInventory())
-                                player.playCodexSound(codexSoundButtonPrevious)
-                                player.playCodexSound(codexSoundMenuSwitch)
-                            }
+                        holder.previousSlot.takeIf { holder.menuConfig.buttons.previous.enabled && holder.currentPage > 0 } -> {
+                            holder.loadPage(holder.currentPage - 1)
+                            player.openInventory(holder.getInventory())
+                            player.playCodexSound(codexSoundButtonPrevious)
+                            player.playCodexSound(codexSoundMenuSwitch)
                         }
-                        holder.nextSlot -> {
-                            if (holder.menuConfig.buttons.next.enabled) {
-                                val maxPage = (holder.filteredQuestsCount - 1) / holder.maxQuestsPerPage
-                                if (holder.currentPage < maxPage) {
-                                    holder.loadPage(holder.currentPage + 1)
-                                    player.openInventory(holder.getInventory())
-                                    player.playCodexSound(codexSoundButtonNext)
-                                    player.playCodexSound(codexSoundMenuSwitch)
-                                }
-                            }
+                        holder.nextSlot.takeIf { 
+                            holder.menuConfig.buttons.next.enabled && 
+                            holder.currentPage < (holder.filteredQuestsCount - 1) / holder.maxQuestsPerPage 
+                        } -> {
+                            holder.loadPage(holder.currentPage + 1)
+                            player.openInventory(holder.getInventory())
+                            player.playCodexSound(codexSoundButtonNext)
+                            player.playCodexSound(codexSoundMenuSwitch)
                         }
-                        holder.sortSlot -> {
-                            if (holder.menuConfig.buttons.sort.enabled) {
-                                holder.sort = holder.sort.next()
-                                holder.loadPage(0)
-                                player.openInventory(holder.getInventory())
-                                player.playCodexSound(codexSoundButtonSort)
-                                player.playCodexSound(codexSoundMenuSwitch)
-                            }
+                        holder.sortSlot.takeIf { holder.menuConfig.buttons.sort.enabled } -> {
+                            holder.sort = holder.sort.next()
+                            holder.loadPage(0)
+                            player.openInventory(holder.getInventory())
+                            player.playCodexSound(codexSoundButtonSort)
+                            player.playCodexSound(codexSoundMenuSwitch)
                         }
-                        holder.backSlot -> {
-                            if (holder.menuConfig.buttons.back.enabled) {
-                                val parent = holder.category.parent
-                                openQuestCodexMenu(player, parent)
-                                player.playCodexSound(codexSoundButtonBack)
-                                player.playCodexSound(codexSoundMenuSwitch)
-                            }
+                        holder.backSlot.takeIf { holder.menuConfig.buttons.back.enabled } -> {
+                            val parent = holder.category.parent
+                            openQuestCodexMenu(player, parent)
+                            player.playCodexSound(codexSoundButtonBack)
+                            player.playCodexSound(codexSoundMenuSwitch)
                         }
-                        holder.replaySlot -> {
+                        holder.replaySlot.takeIf { 
                             val replayConfig = QuestCodexConfig.replayMenu
-                            if (replayConfig.enabled && replayConfig.replayButton.enabled) {
-                                val replayCategory = PrologueReplayRegistry.findByQuestCategory(holder.category.name)
-                                player.openInventory(PrologueReplayInventory(player, replayCategory).getInventory())
-                                player.playCodexSound(codexSoundButtonCategory)
-                                player.playCodexSound(codexSoundMenuOpen)
-                            }
+                            replayConfig.enabled && replayConfig.replayButton.enabled 
+                        } -> {
+                            val replayCategory = PrologueReplayRegistry.findByQuestCategory(holder.category.name)
+                            player.openInventory(PrologueReplayInventory(player, replayCategory).getInventory())
+                            player.playCodexSound(codexSoundButtonCategory)
+                            player.playCodexSound(codexSoundMenuOpen)
                         }
                         else -> {
                             val quest = holder.questForSlot(event.rawSlot)
@@ -117,23 +109,10 @@ class QuestCategoryListener : Listener {
                                 if (event.isLeftClick) {
                                     val ref = quest.ref()
                                     val status = quest.questStatus(player)
-                                    if (status != QuestStatus.ACTIVE) {
-                                        return
-                                    }
-                                    if (player isQuestTracked ref) {
-                                        player.unTrackQuest()
-                                        player.playCodexSound(codexSoundButtonQuestUntrack)
-                                    } else {
-                                        player.trackQuest(ref)
-                                        player.playCodexSound(codexSoundButtonQuestTrack)
-                                    }
-                                    holder.loadPage(holder.currentPage)
-                                    player.openInventory(holder.getInventory())
-                                    player.playCodexSound(codexSoundMenuSwitch)
-                                } else if (event.isLeftClick && event.isShiftClick) {
-                                    // Handle Shift + Left Click from Quest+
-                                    val ref = quest.ref()
-                                    if (quest.questStatus(player) == QuestStatus.ACTIVE && player isQuestTracked ref) {
+                                    if (status != QuestStatus.ACTIVE) return
+
+                                    if (event.isShiftClick) {
+                                        // Handle Shift + Left Click for GPS
                                         val objectives = player.questShowingObjectives(ref)
                                         val triggered = objectives.any { QuestPlusIntegration.triggerGpsShiftClick(it, player) }
 
@@ -142,6 +121,18 @@ class QuestCategoryListener : Listener {
                                             holder.loadPage(holder.currentPage)
                                             player.openInventory(holder.getInventory())
                                         }
+                                    } else {
+                                        // Handle Normal Left Click for Tracking
+                                        if (player isQuestTracked ref) {
+                                            player.unTrackQuest()
+                                            player.playCodexSound(codexSoundButtonQuestUntrack)
+                                        } else {
+                                            player.trackQuest(ref)
+                                            player.playCodexSound(codexSoundButtonQuestTrack)
+                                        }
+                                        holder.loadPage(holder.currentPage)
+                                        player.openInventory(holder.getInventory())
+                                        player.playCodexSound(codexSoundMenuSwitch)
                                     }
                                 }
                                 return
@@ -165,61 +156,55 @@ class QuestCategoryListener : Listener {
                     if (event.clickedInventory != event.view.topInventory) return
 
                     when (event.rawSlot) {
-                        holder.previousSlot() -> {
-                            if (holder.menuConfig.previousButton.enabled && holder.currentPage > 0) {
-                                holder.loadPage(holder.currentPage - 1)
-                                player.openInventory(holder.getInventory())
-                                player.playCodexSound(codexSoundButtonPrevious)
-                                player.playCodexSound(codexSoundMenuSwitch)
-                            }
+                        holder.previousSlot().takeIf { holder.menuConfig.previousButton.enabled && holder.currentPage > 0 } -> {
+                            holder.loadPage(holder.currentPage - 1)
+                            player.openInventory(holder.getInventory())
+                            player.playCodexSound(codexSoundButtonPrevious)
+                            player.playCodexSound(codexSoundMenuSwitch)
                         }
-                        holder.nextSlot() -> {
-                            if (holder.menuConfig.nextButton.enabled && holder.currentPage < holder.maxPage()) {
-                                holder.loadPage(holder.currentPage + 1)
-                                player.openInventory(holder.getInventory())
-                                player.playCodexSound(codexSoundButtonNext)
-                                player.playCodexSound(codexSoundMenuSwitch)
-                            }
+                        holder.nextSlot().takeIf { holder.menuConfig.nextButton.enabled && holder.currentPage < holder.maxPage() } -> {
+                            holder.loadPage(holder.currentPage + 1)
+                            player.openInventory(holder.getInventory())
+                            player.playCodexSound(codexSoundButtonNext)
+                            player.playCodexSound(codexSoundMenuSwitch)
                         }
-                        holder.backSlot() -> {
-                            if (holder.menuConfig.backButton?.enabled == true) {
-                                val commands = holder.backCommands()
-                                    .mapNotNull { it.trim().takeIf(String::isNotEmpty) }
-                                if (commands.isNotEmpty()) {
-                                    player.closeInventory()
-                                    commands.forEach { rawCommand ->
-                                        val parsed = rawCommand.parsePlaceholders(player)
-                                        val normalized = parsed.removePrefix("/").trim()
-                                        if (normalized.isEmpty()) return@forEach
-                                        val executed = player.performCommand(normalized)
-                                        if (!executed) {
-                                            plugin.logger.log(
-                                                Level.WARNING,
-                                                "[QuestCodex] Failed to execute back button command '$normalized' for player ${player.name}."
-                                            )
-                                        }
+                        holder.backSlot().takeIf { holder.menuConfig.backButton?.enabled == true } -> {
+                            val commands = holder.backCommands()
+                                .mapNotNull { it.trim().takeIf(String::isNotEmpty) }
+                            if (commands.isNotEmpty()) {
+                                player.closeInventory()
+                                commands.forEach { rawCommand ->
+                                    val parsed = rawCommand.parsePlaceholders(player)
+                                    val normalized = parsed.removePrefix("/").trim()
+                                    if (normalized.isEmpty()) return@forEach
+                                    val executed = player.performCommand(normalized)
+                                    if (!executed) {
+                                        plugin.logger.log(
+                                            Level.WARNING,
+                                            "[QuestCodex] Failed to execute back button command '$normalized' for player ${player.name}."
+                                        )
                                     }
-                                    player.playCodexSound(codexSoundButtonBack)
-                                    player.playCodexSound(codexSoundMenuSwitch)
-                                    return
                                 }
-                                val parent = holder.parent()
-                                openQuestCodexMenu(player, parent?.parent)
                                 player.playCodexSound(codexSoundButtonBack)
                                 player.playCodexSound(codexSoundMenuSwitch)
+                                return
                             }
+                            val parent = holder.parent()
+                            openQuestCodexMenu(player, parent?.parent)
+                            player.playCodexSound(codexSoundButtonBack)
+                            player.playCodexSound(codexSoundMenuSwitch)
                         }
-                        holder.replaySlot() -> {
+                        holder.replaySlot().takeIf { 
                             val replayConfig = QuestCodexConfig.replayMenu
-                            if (replayConfig.enabled && replayConfig.replayButton.enabled) {
-                                val parent = holder.parent()
-                                val replayCategory = parent?.let { PrologueReplayRegistry.findByQuestCategory(it.name) }
-                                player.openInventory(PrologueReplayInventory(player, replayCategory).getInventory())
-                                player.playCodexSound(codexSoundButtonCategory)
-                                player.playCodexSound(codexSoundMenuOpen)
-                            }
+                            replayConfig.enabled && replayConfig.replayButton.enabled 
+                        } -> {
+                            val parent = holder.parent()
+                            val replayCategory = parent?.let { PrologueReplayRegistry.findByQuestCategory(it.name) }
+                            player.openInventory(PrologueReplayInventory(player, replayCategory).getInventory())
+                            player.playCodexSound(codexSoundButtonCategory)
+                            player.playCodexSound(codexSoundMenuOpen)
                         }
-                        holder.infoSlot() -> {
+                        holder.infoSlot().takeIf { holder.menuConfig.infoButton.enabled } -> {
                             // No action for info button
                         }
                         else -> {

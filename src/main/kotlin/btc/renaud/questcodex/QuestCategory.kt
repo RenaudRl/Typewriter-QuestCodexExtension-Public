@@ -265,8 +265,8 @@ object QuestCategoryRegistry {
         if (nameColor.isNotBlank()) {
             category.nameColor = nameColor
         }
-        if (slot != null && slot >= 0) {
-            category.slot = slot
+        if (slot != null) {
+            category.slot = slot.takeIf { it >= 0 }
         }
         if (questSlots.isNotEmpty()) {
             category.questSlots = questSlots.filter { it >= 0 }

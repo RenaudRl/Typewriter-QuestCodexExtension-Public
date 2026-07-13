@@ -234,25 +234,36 @@ object QuestCodexInitializer : Initializable {
         }
         val status = quest.questStatus(player)
         val questName = quest.displayName.get(player)
-        if (status == QuestStatus.ACTIVE) {
-            // Toggle tracking
-            val questRef = quest.ref()
-            val tracked = player isQuestTracked questRef
-            if (tracked) {
-                player.unTrackQuest()
-                val msg = QuestCodexConfig.stoppedTrackingMessage.replace("{quest}", questName).parsePlaceholders(player)
-                player.sendMessage(mm.deserialize(msg))
-            } else {
-                player trackQuest questRef
-                val msg = QuestCodexConfig.nowTrackingMessage.replace("{quest}", questName).parsePlaceholders(player)
-                player.sendMessage(mm.deserialize(msg))
+        when (status) {
+            QuestStatus.ACTIVE -> {
+                val questRef = quest.ref()
+                val tracked = player isQuestTracked questRef
+                if (tracked) {
+                    player.unTrackQuest()
+                    val msg = QuestCodexConfig.stoppedTrackingMessage.replace("{quest}", questName).parsePlaceholders(player)
+                    if (msg.isNotBlank()) {
+                        player.sendMessage(mm.deserialize(msg))
+                    }
+                } else {
+                    player trackQuest questRef
+                    val msg = QuestCodexConfig.nowTrackingMessage.replace("{quest}", questName).parsePlaceholders(player)
+                    if (msg.isNotBlank()) {
+                        player.sendMessage(mm.deserialize(msg))
+                    }
+                }
             }
-        } else if (status == QuestStatus.INACTIVE) {
-            val msg = QuestCodexConfig.questInactiveMessage.replace("{quest}", questName).parsePlaceholders(player)
-            player.sendMessage(mm.deserialize(msg))
-        } else if (status == QuestStatus.COMPLETED) {
-            val msg = QuestCodexConfig.questCompletedMessage.replace("{quest}", questName).parsePlaceholders(player)
-            player.sendMessage(mm.deserialize(msg))
+            QuestStatus.INACTIVE -> {
+                val msg = QuestCodexConfig.questInactiveMessage.replace("{quest}", questName).parsePlaceholders(player)
+                if (msg.isNotBlank()) {
+                    player.sendMessage(mm.deserialize(msg))
+                }
+            }
+            QuestStatus.COMPLETED -> {
+                val msg = QuestCodexConfig.questCompletedMessage.replace("{quest}", questName).parsePlaceholders(player)
+                if (msg.isNotBlank()) {
+                    player.sendMessage(mm.deserialize(msg))
+                }
+            }
         }
         MenuSessionService.refresh(player)
     }

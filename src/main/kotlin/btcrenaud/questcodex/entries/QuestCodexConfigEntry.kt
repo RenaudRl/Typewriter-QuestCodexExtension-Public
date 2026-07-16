@@ -1,11 +1,14 @@
 package btcrenaud.questcodex.entries
 
 import com.typewritermc.core.books.pages.Colors
+import com.typewritermc.core.entries.Ref
+import com.typewritermc.core.entries.emptyRef
 import com.typewritermc.core.extension.annotations.Entry
 import com.typewritermc.core.extension.annotations.Help
 import com.typewritermc.core.extension.annotations.Placeholder
 import com.typewritermc.core.extension.annotations.Colored
 import com.typewritermc.engine.paper.entry.ManifestEntry
+import com.typewritermc.engine.paper.entry.TriggerableEntry
 import com.typewritermc.engine.paper.utils.DefaultSoundId
 import com.typewritermc.engine.paper.utils.Sound
 
@@ -47,6 +50,8 @@ class QuestCodexConfigEntry(
     @Help("Lore hint telling the player to click to track/un-track this quest.")
     @Placeholder @Colored
     val questTrackHint: String = "<yellow>Clique pour suivre</yellow>",
+    @Help("Entry triggered to open the main menu (e.g. an open_gui entry) when no category_menu with an empty category exists. Used by /tw codex and the BACK button.")
+    val mainMenuTrigger: Ref<TriggerableEntry> = emptyRef(),
 ) : ManifestEntry
 
 object QuestCodexConfig {
@@ -77,6 +82,8 @@ object QuestCodexConfig {
         private set
     var questTrackHint: String = "<yellow>Clique pour suivre</yellow>"
         private set
+    var mainMenuTrigger: Ref<TriggerableEntry> = emptyRef()
+        private set
 
     fun reset() {
         soundOnOpen = defaultSound("minecraft:item.book.page_turn")
@@ -92,6 +99,7 @@ object QuestCodexConfig {
         categoryProgressMessage = "<gray>{completed}/{total} quetes</gray>"
         categoryClickHint = "<yellow>Clique pour voir les quetes</yellow>"
         questTrackHint = "<yellow>Clique pour suivre</yellow>"
+        mainMenuTrigger = emptyRef()
     }
 
     fun apply(entry: QuestCodexConfigEntry) {
@@ -108,6 +116,7 @@ object QuestCodexConfig {
         categoryProgressMessage = entry.categoryProgressMessage
         categoryClickHint = entry.categoryClickHint
         questTrackHint = entry.questTrackHint
+        mainMenuTrigger = entry.mainMenuTrigger
     }
 }
 

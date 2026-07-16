@@ -29,8 +29,10 @@ import btcrenaud.questcodex.navigation.CodexNavDefaults
 import btcrenaud.questcodex.ui.AugmentedSimpleLayout
 import btcrenaud.questcodex.ui.CodexButtonResolverLayout
 import btcrenaud.questcodex.ui.CodexButtonType
+import btcrenaud.questcodex.ui.DynamicSlotContent
 import com.typewritermc.core.entries.Query
 import com.typewritermc.core.extension.Initializable
+import com.typewritermc.engine.paper.entry.triggerEntriesFor
 import com.typewritermc.core.extension.annotations.Singleton
 import com.typewritermc.core.interaction.context
 import com.typewritermc.engine.paper.extensions.placeholderapi.parsePlaceholders
@@ -174,10 +176,16 @@ object QuestCodexInitializer : Initializable {
             CodexNavAction.SCROLL_LEFT -> MenuSessionService.scroll(player, -1, 0)
             CodexNavAction.SCROLL_RIGHT -> MenuSessionService.scroll(player, 1, 0)
             CodexNavAction.BACK -> {
-                if (session.history.isNotEmpty()) {
-                    MenuSessionService.register(player, session.history.pop(), pushHistory = false)
-                } else {
-                    player.closeInventory()
+                // BACK always returns to the main menu when one is configured;
+                // otherwise it falls back to the session history, then closes.
+                val mainConfig = categoryMenuEntries[""]
+                when {
+                    mainConfig != null && mainConfig.usesLayoutPool -> openMainMenu(player)
+                    QuestCodexConfig.mainMenuTrigger.id.isNotBlank() ->
+                        listOf(QuestCodexConfig.mainMenuTrigger).triggerEntriesFor(player, context())
+                    session.history.isNotEmpty() ->
+                        MenuSessionService.register(player, session.history.pop(), pushHistory = false)
+                    else -> player.closeInventory()
                 }
             }
             CodexNavAction.CLOSE -> player.closeInventory()
@@ -393,6 +401,12 @@ object QuestCodexInitializer : Initializable {
 
     /**
      * Opens a menu using the layout pool from a [CategoryMenuEntry].
+     *
+     * QUEST_SLOT/CATEGORY_SLOT markers are rewritten into indexed markers
+     * ("QUEST_SLOT#0", "QUEST_SLOT#1", ...) BEFORE layout parsing, so they live
+     * inside the layout tree and follow scrollable/paginated/frame viewports.
+     * [CodexButtonResolverLayout] swaps each visible marker for its quest/category
+     * content at render time.
      */
     private fun openMenuFromLayoutPool(
         player: Player,
@@ -405,60 +419,59 @@ object QuestCodexInitializer : Initializable {
         val rows = menuConfig.rows.coerceIn(1, 6)
         val size = InventorySize.entries.getOrNull(rows - 1) ?: InventorySize.SIZE_54
 
-        val pool = menuConfig.layoutPool.filterNotNull().associateBy { it.id }
-        val baseLayout: MenuLayout = if (pool.containsKey(menuConfig.mainLayoutId)) {
+        // 1. Index dynamic markers so they traverse parsing as ordinary tagged slots.
+        val markerType = if (isMainMenu) CodexButtonType.CATEGORY_SLOT.name else CodexButtonType.QUEST_SLOT.name
+        val (indexedPool, markerCount) = indexDynamicMarkers(menuConfig.layoutPool.filterNotNull(), markerType)
+
+        // 2. The sort button stays a fixed overlay (it must not scroll away).
+        var sortSlotPos: Pair<Int, Int>? = null
+        val finalPool = indexedPool.map { layoutData ->
+            val (cleaned, sortPos) = extractSortSlot(layoutData)
+            if (sortPos != null) sortSlotPos = sortPos
+            cleaned
+        }
+        val pool = finalPool.associateBy { it.id }
+
+        val baseLayoutCleaned: MenuLayout = if (pool.containsKey(menuConfig.mainLayoutId)) {
             LayoutParser.parse(player, ctx, menuConfig.guiType, size.slots, pool, pool[menuConfig.mainLayoutId]!!)
         } else {
             EmptyLayout
         }
 
-        // Extract dynamic slot positions from all layout data in the pool
-        val dynamicSlotPositions = mutableListOf<Pair<Int, Int>>()
-        var sortSlotPos: Pair<Int, Int>? = null
-        val cleanedPool = mutableMapOf<String, LayoutData>()
-        for ((id, layoutData) in pool) {
-            val (cleaned, positions) = extractDynamicSlots(layoutData, isMainMenu)
-            dynamicSlotPositions.addAll(positions)
-            // Also extract SORT_SLOT
-            val (sortCleaned, sortPos) = extractSortSlot(cleaned)
-            if (sortPos != null) sortSlotPos = sortPos
-            cleanedPool[id] = sortCleaned
-        }
-
-        val baseLayoutCleaned: MenuLayout = if (cleanedPool.containsKey(menuConfig.mainLayoutId)) {
-            LayoutParser.parse(player, ctx, menuConfig.guiType, size.slots, cleanedPool, cleanedPool[menuConfig.mainLayoutId]!!)
-        } else {
-            EmptyLayout
-        }
-
-        val dynamicSlots = mutableListOf<btcrenaud.gui.api.GuiSlot>()
-        val positions = dynamicSlotPositions.toList()
+        // 3. Render-time provider mapping marker indices to quest/category content.
+        val dynamicProvider: (Int) -> DynamicSlotContent?
         if (isMainMenu) {
             @Suppress("UNCHECKED_CAST")
             val categories = entries as List<QuestCategory>
-            categories.forEachIndexed { index, category ->
-                if (index >= positions.size) return@forEachIndexed
-                val (x, y) = positions[index]
-                val icon = buildCategoryIcon(player, category)
-                dynamicSlots.add(btcrenaud.gui.api.GuiSlot(
-                    x = x, y = y, item = icon, allowPickup = false,
-                    commands = listOf("codex:open ${category.name}"),
-                ))
+            if (categories.size > markerCount) {
+                plugin.logger.warning("[QuestCodex] Main menu has ${categories.size} categories but only $markerCount CATEGORY_SLOT markers.")
+            }
+            dynamicProvider = { index ->
+                categories.getOrNull(index)?.let { category ->
+                    DynamicSlotContent(
+                        item = buildCategoryIcon(player, category),
+                        commands = listOf("codex:open ${category.name}"),
+                    )
+                }
             }
         } else {
             @Suppress("UNCHECKED_CAST")
             val questEntries = entries as List<QuestEntry>
             val category = QuestCategoryRegistry.find(menuConfig.category)
-            questEntries.forEachIndexed { index, quest ->
-                if (index >= positions.size) return@forEachIndexed
-                val (x, y) = positions[index]
-                val questItem = buildQuestIcon(player, quest, category!!)
-                dynamicSlots.add(btcrenaud.gui.api.GuiSlot(
-                    x = x, y = y, item = questItem, allowPickup = false,
+            if (questEntries.size > markerCount) {
+                plugin.logger.warning("[QuestCodex] Category '${menuConfig.category}' has ${questEntries.size} quests but only $markerCount QUEST_SLOT markers.")
+            }
+            dynamicProvider = { index ->
+                val quest = questEntries.getOrNull(index)
+                if (quest == null || category == null) null
+                else DynamicSlotContent(
+                    item = buildQuestIcon(player, quest, category),
                     commands = listOf("codex:quest ${quest.id}"),
-                ))
+                )
             }
         }
+
+        val dynamicSlots = mutableListOf<btcrenaud.gui.api.GuiSlot>()
 
         // Build dynamic sort button if SORT_SLOT was found
         if (sortSlotPos != null) {
@@ -497,7 +510,11 @@ object QuestCodexInitializer : Initializable {
         }
 
         val augmentedLayout = AugmentedSimpleLayout(inner = baseLayoutCleaned, dynamicSlots = dynamicSlots)
-        val resolvedLayout = CodexButtonResolverLayout(inner = augmentedLayout, player = player)
+        val resolvedLayout = CodexButtonResolverLayout(
+            inner = augmentedLayout,
+            player = player,
+            dynamicProvider = dynamicProvider,
+        )
 
         val rawTitle = if (isMainMenu) {
             menuConfig.title.ifBlank { "<dark_gray>Codex des Quêtes" }
@@ -529,24 +546,31 @@ object QuestCodexInitializer : Initializable {
     }
 
     /**
-     * Extracts positions of QUEST_SLOT/CATEGORY_SLOT placeholders from a LayoutData,
-     * returning the cleaned layout data (with placeholders removed) and the list of (x,y) positions.
+     * Rewrites QUEST_SLOT/CATEGORY_SLOT marker items into single-position indexed
+     * markers ("QUEST_SLOT#0", "QUEST_SLOT#1", ...). Indexing follows pool order,
+     * then item order, then the item's own repetition (row-major), giving a stable
+     * quest ordering that survives viewport clipping and scrolling.
      */
-    private fun extractDynamicSlots(data: LayoutData, isMainMenu: Boolean): Pair<LayoutData, List<Pair<Int, Int>>> {
-        val markerType = if (isMainMenu) "CATEGORY_SLOT" else "QUEST_SLOT"
-        return when (data) {
-            is SimpleLayoutData -> {
-                val positions = mutableListOf<Pair<Int, Int>>()
-                val remaining = data.items.filter { item ->
-                    if (item.buttonType == markerType) {
-                        positions.addAll(expandItemPositions(item))
-                        false
-                    } else true
+    private fun indexDynamicMarkers(pool: List<LayoutData>, markerType: String): Pair<List<LayoutData>, Int> {
+        var counter = 0
+        val rewritten = pool.map { data ->
+            if (data !is SimpleLayoutData) return@map data
+            val newItems = data.items.flatMap { item ->
+                if (item.buttonType != markerType) listOf(item)
+                else expandMarkerPositions(item).map { (px, py) ->
+                    item.copy(
+                        buttonType = "$markerType#${counter++}",
+                        x = px,
+                        y = py,
+                        direction = null,
+                        count = 1,
+                        repeatY = 1,
+                    )
                 }
-                data.copy(items = remaining) to positions
             }
-            else -> data to emptyList()
+            data.copy(items = newItems)
         }
+        return rewritten to counter
     }
 
     private fun extractSortSlot(data: LayoutData): Pair<LayoutData, Pair<Int, Int>?> {
@@ -565,20 +589,24 @@ object QuestCodexInitializer : Initializable {
         }
     }
 
-    private fun expandItemPositions(item: GuiItemData): List<Pair<Int, Int>> {
-        val positions = mutableListOf(Pair(item.x, item.y))
-        val dir = item.direction
-        if (dir != null && item.count > 1) {
-            for (i in 1 until item.count) {
-                val gap = item.gap + 1
-                positions.add(
-                    when (dir) {
-                        Direction.right -> Pair(item.x + i * gap, item.y)
-                        Direction.down -> Pair(item.x, item.y + i * gap)
-                        Direction.left -> Pair(item.x - i * gap, item.y)
-                        Direction.up -> Pair(item.x, item.y - i * gap)
-                    }
-                )
+    /**
+     * Expands a marker item's repetition into individual positions, mirroring
+     * GuiSlotBuilder's semantics (gap is a step multiplier, repeatY adds rows).
+     */
+    private fun expandMarkerPositions(item: GuiItemData): List<Pair<Int, Int>> {
+        val direction = item.direction ?: return listOf(item.x to item.y)
+        val positions = mutableListOf<Pair<Int, Int>>()
+        for (ry in 0 until item.repeatY.coerceAtLeast(1)) {
+            for (rc in 0 until item.count.coerceAtLeast(1)) {
+                val px: Int
+                val py: Int
+                when (direction) {
+                    Direction.right -> { px = item.x + rc * item.gap; py = item.y + ry * item.gap }
+                    Direction.left -> { px = item.x - rc * item.gap; py = item.y + ry * item.gap }
+                    Direction.down -> { px = item.x + ry * item.gap; py = item.y + rc * item.gap }
+                    Direction.up -> { px = item.x + ry * item.gap; py = item.y - rc * item.gap }
+                }
+                positions.add(px to py)
             }
         }
         return positions
@@ -597,7 +625,13 @@ object QuestCodexInitializer : Initializable {
         val menuConfig = categoryMenuEntries[""]
 
         if (menuConfig == null || !menuConfig.usesLayoutPool) {
-            plugin.logger.warning("[QuestCodex] Main menu opened but no category_menu entry with layout pool found. Create a category_menu entry with empty category and a layout pool.")
+            // Fallback: a custom main menu (e.g. an open_gui entry) declared in the quest_codex config.
+            val trigger = QuestCodexConfig.mainMenuTrigger
+            if (trigger.id.isNotBlank()) {
+                listOf(trigger).triggerEntriesFor(player, context())
+                return
+            }
+            plugin.logger.warning("[QuestCodex] Main menu opened but no category_menu entry with layout pool found. Create a category_menu entry with empty category, or set mainMenuTrigger in the quest_codex config.")
             return
         }
 

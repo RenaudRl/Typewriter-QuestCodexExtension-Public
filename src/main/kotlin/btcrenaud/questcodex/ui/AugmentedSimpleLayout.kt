@@ -14,7 +14,9 @@ class AugmentedSimpleLayout(
     override val id: String? = null,
 ) : MenuLayout {
 
-    override val innerLayout: MenuLayout? get() = inner.innerLayout
+    // Expose the wrapped layout itself so the session service can traverse the full
+    // tree (frames, scrollables) when initializing viewports and resolving scrolls.
+    override val innerLayout: MenuLayout? get() = inner
 
     override fun getSlots(
         session: MenuSessionService.ActiveSession,

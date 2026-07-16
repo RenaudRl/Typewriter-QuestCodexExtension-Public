@@ -40,12 +40,17 @@ class CodexCategoryArgumentType : CustomArgumentType.Converted<String, String> {
 
 /**
  * `/typewriter codex` commands.
+ * - `/tw codex` → opens the main codex menu (requires a category_menu entry with empty category)
  * - `/tw codex <category>` → opens a specific category with tab completion
- * - Use the Demo Hub to access the main Codex menu
  */
 @TypewriterCommand
 fun CommandTree.questCodexCommands() = literal("codex") {
     withPermission("typewriter.codex.open")
+
+    // /tw codex → opens the main codex menu
+    executePlayer { player ->
+        QuestCodexInitializer.openMainMenu(player)
+    }
 
     // /tw codex <category> → opens specific category
     argument("category", CodexCategoryArgumentType(), String::class) { categoryArg ->

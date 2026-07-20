@@ -31,25 +31,25 @@ class QuestCodexConfigEntry(
 
     @Help("Message shown when a player starts tracking a quest. Placeholders: {quest}")
     @Placeholder @Colored
-    val nowTrackingMessage: String = "<green>Tu suis maintenant : {quest}</green>",
+    val nowTrackingMessage: String = "<green>Now tracking: {quest}</green>",
     @Help("Message shown when a player stops tracking a quest. Placeholders: {quest}")
     @Placeholder @Colored
-    val stoppedTrackingMessage: String = "<gray>Tu ne suis plus : {quest}</gray>",
+    val stoppedTrackingMessage: String = "<gray>No longer tracking: {quest}</gray>",
     @Help("Message shown when clicking an inactive quest. Placeholders: {quest}")
     @Placeholder @Colored
-    val questInactiveMessage: String = "<gold>{quest} — Commence cette quete !</gold>",
+    val questInactiveMessage: String = "<gold>{quest} — Start this quest!</gold>",
     @Help("Message shown when clicking a completed quest. Placeholders: {quest}")
     @Placeholder @Colored
-    val questCompletedMessage: String = "<green>{quest} — Completee !</green>",
+    val questCompletedMessage: String = "<green>{quest} — Completed!</green>",
     @Help("Lore line showing category progress. Placeholders: {completed}, {total}")
     @Placeholder @Colored
-    val categoryProgressMessage: String = "<gray>{completed}/{total} quetes</gray>",
+    val categoryProgressMessage: String = "<gray>{completed}/{total} quests</gray>",
     @Help("Lore hint telling the player to click to see quests.")
     @Placeholder @Colored
-    val categoryClickHint: String = "<yellow>Clique pour voir les quetes</yellow>",
+    val categoryClickHint: String = "<yellow>Click to view quests</yellow>",
     @Help("Lore hint telling the player to click to track/un-track this quest.")
     @Placeholder @Colored
-    val questTrackHint: String = "<yellow>Clique pour suivre</yellow>",
+    val questTrackHint: String = "<yellow>Click to track</yellow>",
     @Help("Entry triggered to open the main menu (e.g. an open_gui entry) when no category_menu with an empty category exists. Used by /tw codex and the BACK button.")
     val mainMenuTrigger: Ref<TriggerableEntry> = emptyRef(),
 ) : ManifestEntry
@@ -68,19 +68,19 @@ object QuestCodexConfig {
     var defaultRows: Int = 4
         private set
 
-    var nowTrackingMessage: String = "<green>Tu suis maintenant : {quest}</green>"
+    var nowTrackingMessage: String = "<green>Now tracking: {quest}</green>"
         private set
-    var stoppedTrackingMessage: String = "<gray>Tu ne suis plus : {quest}</gray>"
+    var stoppedTrackingMessage: String = "<gray>No longer tracking: {quest}</gray>"
         private set
-    var questInactiveMessage: String = "<gold>{quest} — Commence cette quete !</gold>"
+    var questInactiveMessage: String = "<gold>{quest} — Start this quest!</gold>"
         private set
-    var questCompletedMessage: String = "<green>{quest} — Completee !</green>"
+    var questCompletedMessage: String = "<green>{quest} — Completed!</green>"
         private set
-    var categoryProgressMessage: String = "<gray>{completed}/{total} quetes</gray>"
+    var categoryProgressMessage: String = "<gray>{completed}/{total} quests</gray>"
         private set
-    var categoryClickHint: String = "<yellow>Clique pour voir les quetes</yellow>"
+    var categoryClickHint: String = "<yellow>Click to view quests</yellow>"
         private set
-    var questTrackHint: String = "<yellow>Clique pour suivre</yellow>"
+    var questTrackHint: String = "<yellow>Click to track</yellow>"
         private set
     var mainMenuTrigger: Ref<TriggerableEntry> = emptyRef()
         private set
@@ -92,13 +92,13 @@ object QuestCodexConfig {
         soundOnTrack = defaultSound("minecraft:entity.arrow.hit_player")
         soundOnUntrack = defaultSound("minecraft:entity.arrow.hit_player")
         defaultRows = 4
-        nowTrackingMessage = "<green>Tu suis maintenant : {quest}</green>"
-        stoppedTrackingMessage = "<gray>Tu ne suis plus : {quest}</gray>"
-        questInactiveMessage = "<gold>{quest} — Commence cette quete !</gold>"
-        questCompletedMessage = "<green>{quest} — Completee !</green>"
-        categoryProgressMessage = "<gray>{completed}/{total} quetes</gray>"
-        categoryClickHint = "<yellow>Clique pour voir les quetes</yellow>"
-        questTrackHint = "<yellow>Clique pour suivre</yellow>"
+        nowTrackingMessage = "<green>Now tracking: {quest}</green>"
+        stoppedTrackingMessage = "<gray>No longer tracking: {quest}</gray>"
+        questInactiveMessage = "<gold>{quest} — Start this quest!</gold>"
+        questCompletedMessage = "<green>{quest} — Completed!</green>"
+        categoryProgressMessage = "<gray>{completed}/{total} quests</gray>"
+        categoryClickHint = "<yellow>Click to view quests</yellow>"
+        questTrackHint = "<yellow>Click to track</yellow>"
         mainMenuTrigger = emptyRef()
     }
 

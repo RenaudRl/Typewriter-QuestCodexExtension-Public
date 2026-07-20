@@ -6,8 +6,8 @@ import btcrenaud.gui.api.MenuLayout
 import btcrenaud.gui.api.Viewport
 import btcrenaud.gui.services.MenuSessionService
 import btcrenaud.questcodex.navigation.CodexNavAction
-import btcrenaud.questcodex.navigation.CodexNavButton
 import btcrenaud.questcodex.navigation.CodexNavDefaults
+import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -28,13 +28,14 @@ data class DynamicSlotContent(
  * visible marker for the n-th quest/category content at the marker's final on-screen
  * position. Markers whose index has no content render as empty slots.
  *
- * Navigation tags (BACK, CLOSE, SCROLL_*, ...) resolve to nav buttons that keep the
- * tagged slot's position unless an explicit slot is configured in [navButtons].
+ * Navigation tags (BACK, CLOSE, SCROLL_*, ...) resolve to nav buttons at the tagged
+ * slot's position. The author-configured icon, name and lore on that slot are kept
+ * verbatim; the built-in default icon + label is used only when the slot has no
+ * configured item.
  */
 class CodexButtonResolverLayout(
     inner: MenuLayout,
     private val player: Player,
-    private val navButtons: List<CodexNavButton> = emptyList(),
     private val dynamicProvider: ((Int) -> DynamicSlotContent?)? = null,
     override val id: String? = null,
 ) : MenuLayout {
@@ -93,20 +94,27 @@ class CodexButtonResolverLayout(
 
         val action = buttonType.toNavAction() ?: return null
 
-        val config = navButtons.find { it.action == action }
-        val item: ItemStack = config?.item?.build(p) ?: CodexNavDefaults.defaultItem(action).build(p)
-        val label: String = config?.label?.ifEmpty { null } ?: CodexNavDefaults.defaultLabel(action)
+        // Full customization: when the tagged slot carries an author-configured icon
+        // (optionally with a name and lore), keep it verbatim and only attach the nav
+        // behavior. Fall back to the built-in default icon + label only when the slot
+        // has no configured item (STRUCTURE_VOID placeholder built by GuiSlotBuilder).
+        val configured = original.item
+        val item: ItemStack = if (configured.type != Material.STRUCTURE_VOID && !configured.type.isAir) {
+            configured.clone()
+        } else {
+            val fallback = CodexNavDefaults.defaultItem(action).build(p)
+            val meta = fallback.itemMeta
+            meta.displayName(
+                mm.deserialize(CodexNavDefaults.defaultLabel(action))
+                    .decoration(TextDecoration.ITALIC, false)
+            )
+            fallback.itemMeta = meta
+            fallback
+        }
 
-        val slotIndex = config?.slot ?: -1
-
-        val meta = item.itemMeta
-        meta.displayName(mm.deserialize(label))
-        item.itemMeta = meta
-
-        // An explicit configured slot wins; otherwise keep the tagged slot's position.
         return GuiSlot(
-            x = if (slotIndex >= 0) slotIndex % 9 else original.x,
-            y = if (slotIndex >= 0) slotIndex / 9 else original.y,
+            x = original.x,
+            y = original.y,
             item = item,
             allowPickup = false,
             commands = listOf("codex:nav ${action.name}"),

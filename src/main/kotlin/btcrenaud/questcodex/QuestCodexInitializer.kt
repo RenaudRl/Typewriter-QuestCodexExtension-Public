@@ -24,7 +24,6 @@ import btcrenaud.questcodex.entries.QuestLoreEntry
 import btcrenaud.questcodex.entries.SortModeConfig
 import btcrenaud.questcodex.entries.QuestCodexConfig
 import btcrenaud.questcodex.navigation.CodexNavAction
-import btcrenaud.questcodex.navigation.CodexNavButton
 import btcrenaud.questcodex.navigation.CodexNavDefaults
 import btcrenaud.questcodex.ui.AugmentedSimpleLayout
 import btcrenaud.questcodex.ui.CodexButtonResolverLayout
@@ -489,16 +488,21 @@ object QuestCodexInitializer : Initializable {
             }
             val sortLabel = display?.label?.takeIf { it.isNotBlank() }
                 ?: when (currentSortMode) {
-                    SortMode.ALL -> "<yellow>📋 Toutes les quêtes"
-                    SortMode.NOT_STARTED -> "<white>📋 Non commencées"
-                    SortMode.ACTIVE -> "<green>📋 En cours"
-                    SortMode.COMPLETED -> "<gray>📋 Terminées"
+                    SortMode.ALL -> "<yellow>📋 All quests"
+                    SortMode.NOT_STARTED -> "<white>📋 Not started"
+                    SortMode.ACTIVE -> "<green>📋 In progress"
+                    SortMode.COMPLETED -> "<gray>📋 Completed"
                 }
             val sortLore = display?.lore?.takeIf { it.isNotEmpty() }
-                ?: listOf("<gray>Cliquez pour changer le tri")
+                ?: listOf("<gray>Click to change sorting")
             val sortMeta = sortItem.itemMeta
-            sortMeta.displayName(mm.deserialize(sortLabel))
-            sortMeta.lore(sortLore.map { mm.deserialize(it) })
+            sortMeta.displayName(
+                mm.deserialize(sortLabel)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false)
+            )
+            sortMeta.lore(sortLore.map {
+                mm.deserialize(it).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false)
+            })
             sortItem.itemMeta = sortMeta
             dynamicSlots.add(btcrenaud.gui.api.GuiSlot(
                 x = sortSlotPos.first,
@@ -517,7 +521,7 @@ object QuestCodexInitializer : Initializable {
         )
 
         val rawTitle = if (isMainMenu) {
-            menuConfig.title.ifBlank { "<dark_gray>Codex des Quêtes" }
+            menuConfig.title.ifBlank { "<dark_gray>Quest Codex" }
         } else {
             menuConfig.title.ifBlank { QuestCategoryRegistry.find(menuConfig.category)?.title ?: menuConfig.category }
         }.parsePlaceholders(player)

@@ -23,15 +23,15 @@ object CodexNavDefaults {
     )
 
     val label: Map<CodexNavAction, String> = mapOf(
-        CodexNavAction.PAGE_NEXT to "<yellow>Suivant",
-        CodexNavAction.PAGE_PREV to "<yellow>Precedent",
-        CodexNavAction.SCROLL_UP to "<white>Haut",
-        CodexNavAction.SCROLL_DOWN to "<white>Bas",
-        CodexNavAction.SCROLL_LEFT to "<white>Gauche",
-        CodexNavAction.SCROLL_RIGHT to "<white>Droite",
-        CodexNavAction.BACK to "<red>Retour",
-        CodexNavAction.CLOSE to "<red>Fermer",
-        CodexNavAction.SORT to "<yellow>Trier",
+        CodexNavAction.PAGE_NEXT to "<yellow>Next",
+        CodexNavAction.PAGE_PREV to "<yellow>Previous",
+        CodexNavAction.SCROLL_UP to "<white>Up",
+        CodexNavAction.SCROLL_DOWN to "<white>Down",
+        CodexNavAction.SCROLL_LEFT to "<white>Left",
+        CodexNavAction.SCROLL_RIGHT to "<white>Right",
+        CodexNavAction.BACK to "<red>Back",
+        CodexNavAction.CLOSE to "<red>Close",
+        CodexNavAction.SORT to "<yellow>Sort",
     )
 
     val sound: Map<CodexNavAction, Sound> = mapOf(

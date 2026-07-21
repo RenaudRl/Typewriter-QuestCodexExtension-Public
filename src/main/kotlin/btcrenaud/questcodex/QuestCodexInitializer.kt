@@ -6,7 +6,7 @@ import btcrenaud.gui.InventorySize
 import btcrenaud.gui.LayoutData
 import btcrenaud.gui.SimpleLayoutData
 import btcrenaud.gui.GuiItemData
-import btcrenaud.gui.Direction
+import btcrenaud.gui.GuiSlotBuilder
 import btcrenaud.gui.api.LayoutParser
 import btcrenaud.gui.api.MenuDefinition
 import btcrenaud.gui.api.MenuLayout
@@ -594,27 +594,13 @@ object QuestCodexInitializer : Initializable {
     }
 
     /**
-     * Expands a marker item's repetition into individual positions, mirroring
-     * GuiSlotBuilder's semantics (gap is a step multiplier, repeatY adds rows).
+     * Expands a marker item's repetition into individual positions. Delegates to
+     * [GuiSlotBuilder.expandPositions] so codex markers always spread exactly like the
+     * GUI extension renders them — a private copy of this maths is how the semantics
+     * drifted between extensions in the first place.
      */
-    private fun expandMarkerPositions(item: GuiItemData): List<Pair<Int, Int>> {
-        val direction = item.direction ?: return listOf(item.x to item.y)
-        val positions = mutableListOf<Pair<Int, Int>>()
-        for (ry in 0 until item.repeatY.coerceAtLeast(1)) {
-            for (rc in 0 until item.count.coerceAtLeast(1)) {
-                val px: Int
-                val py: Int
-                when (direction) {
-                    Direction.right -> { px = item.x + rc * item.gap; py = item.y + ry * item.gap }
-                    Direction.left -> { px = item.x - rc * item.gap; py = item.y + ry * item.gap }
-                    Direction.down -> { px = item.x + ry * item.gap; py = item.y + rc * item.gap }
-                    Direction.up -> { px = item.x + ry * item.gap; py = item.y - rc * item.gap }
-                }
-                positions.add(px to py)
-            }
-        }
-        return positions
-    }
+    private fun expandMarkerPositions(item: GuiItemData): List<Pair<Int, Int>> =
+        GuiSlotBuilder.expandPositions(item)
 
     /**
      * Opens the main codex menu (list of root categories) for a player.

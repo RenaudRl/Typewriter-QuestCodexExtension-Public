@@ -4,7 +4,9 @@ plugins {
 }
 
 group = "btcrenaud"
-version = "0.3.2"
+version = "2.5"
+
+val omniGuiVersion = "0.9"
 
 repositories {
     mavenCentral()
@@ -12,12 +14,22 @@ repositories {
     maven("https://maven.typewritermc.com/beta/")
     maven("https://maven.typewritermc.com/external")
     mavenLocal()
+    ivy {
+        name = "omniGuiGitHubReleases"
+        url = uri("https://github.com/RenaudRl/Typewriter-OmniGUIExtension/releases/download")
+        patternLayout {
+            artifact("[revision]/Typewriter-OmniGUIExtension-$omniGuiVersion.[ext]")
+        }
+        metadataSources {
+            artifact()
+        }
+    }
 }
 
 dependencies {
     compileOnly("de.bluecolored:bluemap-api:2.7.3")
     compileOnly("com.flowpowered:flow-math:1.0.3")
-    compileOnly(project(":Typewriter-OmniGUIExtension"))
+    compileOnly("btcrenaud:Typewriter-OmniGUIExtension:v$omniGuiVersion@jar")
     compileOnly("com.typewritermc:QuestExtension:0.9.0")
 }
 

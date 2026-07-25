@@ -64,17 +64,42 @@ class CodexButtonResolverLayout(
         val hashIndex = type.indexOf('#')
         if (hashIndex >= 0) {
             val base = type.take(hashIndex)
-            if (base != CodexButtonType.QUEST_SLOT.name && base != CodexButtonType.CATEGORY_SLOT.name) return null
+            if (base != CodexButtonType.QUEST_SLOT.name &&
+                base != CodexButtonType.TRACKED_QUEST_SLOT.name &&
+                base != CodexButtonType.CATEGORY_SLOT.name
+            ) return null
             val index = type.substring(hashIndex + 1).toIntOrNull() ?: return null
             val content = dynamicProvider?.invoke(index)
-                ?: return GuiSlot(x = original.x, y = original.y, item = ItemStack(Material.AIR), allowPickup = false)
-            return GuiSlot(
-                x = original.x,
-                y = original.y,
+            if (content == null) {
+                // A tracked marker doubles as its fully author-configurable EMPTY state.
+                // It remains inert, so lore such as "Click to stop tracking" is never
+                // attached by the extension when no quest occupies this position.
+                if (base == CodexButtonType.TRACKED_QUEST_SLOT.name) {
+                    return original.copy(
+                        allowPickup = false,
+                        isGhost = false,
+                        commands = emptyList(),
+                        triggers = emptyList(),
+                        modifiers = emptyList(),
+                        interactions = emptyMap(),
+                        input = null,
+                        storage = null,
+                        onClick = null,
+                    )
+                }
+                return GuiSlot(x = original.x, y = original.y, item = ItemStack(Material.AIR), allowPickup = false)
+            }
+            return original.copy(
                 item = content.item,
                 allowPickup = false,
+                isGhost = false,
                 commands = content.commands,
-                tag = original.tag,
+                triggers = emptyList(),
+                modifiers = emptyList(),
+                interactions = emptyMap(),
+                input = null,
+                storage = null,
+                onClick = null,
             )
         }
 
@@ -86,6 +111,7 @@ class CodexButtonResolverLayout(
 
         // Un-indexed placeholder markers (wrong menu kind or leftovers) are hidden.
         if (buttonType == CodexButtonType.QUEST_SLOT ||
+            buttonType == CodexButtonType.TRACKED_QUEST_SLOT ||
             buttonType == CodexButtonType.CATEGORY_SLOT ||
             buttonType == CodexButtonType.SORT_SLOT
         ) {
@@ -134,6 +160,7 @@ private fun CodexButtonType.toNavAction(): CodexNavAction? = when (this) {
     CodexButtonType.CLOSE -> CodexNavAction.CLOSE
     CodexButtonType.SORT -> CodexNavAction.SORT
     CodexButtonType.QUEST_SLOT -> null
+    CodexButtonType.TRACKED_QUEST_SLOT -> null
     CodexButtonType.CATEGORY_SLOT -> null
     CodexButtonType.SORT_SLOT -> null
 }

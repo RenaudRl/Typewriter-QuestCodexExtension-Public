@@ -52,6 +52,12 @@ fun CommandTree.questCodexCommands() = literal("codex") {
         QuestCodexInitializer.openMainMenu(player)
     }
 
+    literal("tracked") {
+        executePlayer { player ->
+            QuestCodexInitializer.openTrackedQuestsMenu(player)
+        }
+    }
+
     // /tw codex <category> → opens specific category
     argument("category", CodexCategoryArgumentType(), String::class) { categoryArg ->
         executePlayer { player ->

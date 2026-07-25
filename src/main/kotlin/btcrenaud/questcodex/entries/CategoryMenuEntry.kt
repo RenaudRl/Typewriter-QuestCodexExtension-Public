@@ -1,9 +1,9 @@
 package btcrenaud.questcodex.entries
 
-import btcrenaud.gui.GuiAudioData
-import btcrenaud.gui.GuiType
-import btcrenaud.gui.LayoutData
+import btcrenaud.gui.OpenGuiActionEntry
 import com.typewritermc.core.books.pages.Colors
+import com.typewritermc.core.entries.Ref
+import com.typewritermc.core.entries.emptyRef
 import com.typewritermc.core.extension.annotations.Entry
 import com.typewritermc.core.extension.annotations.Help
 import com.typewritermc.core.extension.annotations.Placeholder
@@ -54,18 +54,17 @@ class CategoryMenuEntry(
     val title: String = "",
     @Help("Number of inventory rows (3-6).")
     val rows: Int = 4,
-    @Help("GUI type. Use CUSTOM for fully custom layouts.")
-    val guiType: GuiType = GuiType.CUSTOM,
-    @Help("Audio configuration overrides for this menu.")
-    val audio: GuiAudioData = GuiAudioData(),
-    @Help("Layout pool for declarative menu design.")
-    val layoutPool: List<LayoutData> = emptyList(),
-    @Help("ID of the main layout within the layout pool to display.")
-    val mainLayoutId: String = "",
+    @Help("GUI entry providing the layout pool, main layout, type and audio configuration.")
+    val menu: Ref<OpenGuiActionEntry> = emptyRef(),
     @Help("Per-mode display overrides for the sort button. Define one entry per sort mode.")
     val sortDisplay: List<SortDisplayConfig> = emptyList(),
 ) : ManifestEntry {
 
+    private val resolvedMenu: OpenGuiActionEntry? get() = menu.get()
+    val layoutPool get() = resolvedMenu?.layoutPool ?: emptyList()
+    val mainLayoutId: String get() = resolvedMenu?.mainLayoutId.orEmpty()
+    val guiType get() = resolvedMenu?.guiType ?: btcrenaud.gui.GuiType.CUSTOM
+    val audio get() = resolvedMenu?.audio ?: btcrenaud.gui.GuiAudioData()
     val usesLayoutPool: Boolean get() = layoutPool.isNotEmpty() && mainLayoutId.isNotBlank()
 
     /** Gets the display config for a given sort mode, falling back to defaults. */

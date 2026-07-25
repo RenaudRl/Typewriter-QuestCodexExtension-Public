@@ -28,6 +28,12 @@ class QuestCodexConfigEntry(
     val soundOnUntrack: Sound = defaultSound("minecraft:entity.arrow.hit_player"),
     @Help("Default number of inventory rows for category menus (3-6).")
     val defaultRows: Int = 4,
+    @Help("Allow QuestCodex to track several active quests while the official Quest tracker displays the most recently selected one.")
+    val multiTrackingEnabled: Boolean = true,
+    @Help("Maximum number of quests tracked simultaneously by QuestCodex.")
+    val maxTrackedQuests: Int = 5,
+    @Help("Artifact used to persist each player's tracked quest ids and their tracking order.")
+    val trackingArtifact: Ref<QuestCodexTrackingArtifactEntry> = emptyRef(),
 
     @Help("Message shown when a player starts tracking a quest. Placeholders: {quest}")
     @Placeholder @Colored
@@ -50,6 +56,12 @@ class QuestCodexConfigEntry(
     @Help("Lore hint telling the player to click to track/un-track this quest.")
     @Placeholder @Colored
     val questTrackHint: String = "<yellow>Click to track</yellow>",
+    @Help("Lore hint shown for a quest already tracked by QuestCodex.")
+    @Placeholder @Colored
+    val questUntrackHint: String = "<yellow>Click to stop tracking</yellow>",
+    @Help("Message shown when the simultaneous tracking limit is reached. Placeholder: {max}.")
+    @Placeholder @Colored
+    val trackingLimitMessage: String = "<red>You can track at most {max} quests.</red>",
     @Help("Entry triggered to open the main menu (e.g. an open_gui entry) when no category_menu with an empty category exists. Used by /tw codex and the BACK button.")
     val mainMenuTrigger: Ref<TriggerableEntry> = emptyRef(),
 ) : ManifestEntry
@@ -67,6 +79,12 @@ object QuestCodexConfig {
         private set
     var defaultRows: Int = 4
         private set
+    var multiTrackingEnabled: Boolean = true
+        private set
+    var maxTrackedQuests: Int = 5
+        private set
+    var trackingArtifact: Ref<QuestCodexTrackingArtifactEntry> = emptyRef()
+        private set
 
     var nowTrackingMessage: String = "<green>Now tracking: {quest}</green>"
         private set
@@ -82,6 +100,10 @@ object QuestCodexConfig {
         private set
     var questTrackHint: String = "<yellow>Click to track</yellow>"
         private set
+    var questUntrackHint: String = "<yellow>Click to stop tracking</yellow>"
+        private set
+    var trackingLimitMessage: String = "<red>You can track at most {max} quests.</red>"
+        private set
     var mainMenuTrigger: Ref<TriggerableEntry> = emptyRef()
         private set
 
@@ -92,6 +114,9 @@ object QuestCodexConfig {
         soundOnTrack = defaultSound("minecraft:entity.arrow.hit_player")
         soundOnUntrack = defaultSound("minecraft:entity.arrow.hit_player")
         defaultRows = 4
+        multiTrackingEnabled = true
+        maxTrackedQuests = 5
+        trackingArtifact = emptyRef()
         nowTrackingMessage = "<green>Now tracking: {quest}</green>"
         stoppedTrackingMessage = "<gray>No longer tracking: {quest}</gray>"
         questInactiveMessage = "<gold>{quest} — Start this quest!</gold>"
@@ -99,6 +124,8 @@ object QuestCodexConfig {
         categoryProgressMessage = "<gray>{completed}/{total} quests</gray>"
         categoryClickHint = "<yellow>Click to view quests</yellow>"
         questTrackHint = "<yellow>Click to track</yellow>"
+        questUntrackHint = "<yellow>Click to stop tracking</yellow>"
+        trackingLimitMessage = "<red>You can track at most {max} quests.</red>"
         mainMenuTrigger = emptyRef()
     }
 
@@ -109,6 +136,9 @@ object QuestCodexConfig {
         soundOnTrack = entry.soundOnTrack
         soundOnUntrack = entry.soundOnUntrack
         defaultRows = entry.defaultRows.coerceIn(3, 6)
+        multiTrackingEnabled = entry.multiTrackingEnabled
+        maxTrackedQuests = entry.maxTrackedQuests.coerceAtLeast(1)
+        trackingArtifact = entry.trackingArtifact
         nowTrackingMessage = entry.nowTrackingMessage
         stoppedTrackingMessage = entry.stoppedTrackingMessage
         questInactiveMessage = entry.questInactiveMessage
@@ -116,6 +146,8 @@ object QuestCodexConfig {
         categoryProgressMessage = entry.categoryProgressMessage
         categoryClickHint = entry.categoryClickHint
         questTrackHint = entry.questTrackHint
+        questUntrackHint = entry.questUntrackHint
+        trackingLimitMessage = entry.trackingLimitMessage
         mainMenuTrigger = entry.mainMenuTrigger
     }
 }

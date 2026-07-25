@@ -14,6 +14,7 @@ enum class CodexButtonType {
     CLOSE,
     SORT,
     QUEST_SLOT,
+    TRACKED_QUEST_SLOT,
     CATEGORY_SLOT,
     SORT_SLOT,
 }

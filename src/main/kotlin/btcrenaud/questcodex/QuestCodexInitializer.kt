@@ -29,6 +29,7 @@ import btcrenaud.questcodex.ui.AugmentedSimpleLayout
 import btcrenaud.questcodex.ui.CodexButtonResolverLayout
 import btcrenaud.questcodex.ui.CodexButtonType
 import btcrenaud.questcodex.ui.DynamicSlotContent
+import btcrenaud.questcodex.tracking.QuestCodexTrackingService
 import com.typewritermc.core.entries.Query
 import com.typewritermc.core.extension.Initializable
 import com.typewritermc.engine.paper.entry.triggerEntriesFor
@@ -39,15 +40,17 @@ import com.typewritermc.engine.paper.plugin
 import com.typewritermc.engine.paper.utils.item.CustomItem
 import com.typewritermc.quest.entries.QuestEntry
 import com.typewritermc.quest.QuestStatus
-import com.typewritermc.quest.isQuestTracked
-import com.typewritermc.quest.trackQuest
-import com.typewritermc.quest.unTrackQuest
 import com.typewritermc.core.entries.ref
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
+import org.bukkit.event.EventHandler
+import org.bukkit.event.EventPriority
+import org.bukkit.event.HandlerList
+import org.bukkit.event.Listener
+import org.bukkit.event.player.PlayerJoinEvent
 import com.typewritermc.engine.paper.interaction.PlayerSessionManager
 
 /**
@@ -68,6 +71,17 @@ object QuestCodexInitializer : Initializable {
     // ── Loaded data ──
     private val categoryMenuEntries = mutableMapOf<String, CategoryMenuEntry>()
     private val questLoreEntries = mutableMapOf<String, MutableList<QuestLoreEntry>>()
+    private val playerLifecycleListener = object : Listener {
+        @EventHandler(priority = EventPriority.MONITOR)
+        fun onJoin(event: PlayerJoinEvent) {
+            event.player.scheduler.runDelayed(
+                plugin,
+                { QuestCodexTrackingService.restorePrimary(event.player) },
+                null,
+                2L,
+            )
+        }
+    }
 
     override suspend fun initialize() {
         val manager = Bukkit.getPluginManager()
@@ -85,6 +99,14 @@ object QuestCodexInitializer : Initializable {
 
         // ── Step 1: Load global config ──
         loadGlobalConfig()
+        val trackingArtifact = QuestCodexConfig.trackingArtifact.get()
+        QuestCodexTrackingService.initialize(trackingArtifact, QuestCodexConfig.maxTrackedQuests)
+        if (trackingArtifact == null) {
+            plugin.logger.warning(
+                "[QuestCodex] No trackingArtifact is configured; multi-tracking will be memory-only."
+            )
+        }
+        manager.registerEvents(playerLifecycleListener, plugin)
 
         // ── Step 2: Load category menu configs ──
         Query.find<CategoryMenuEntry>().forEach { entry ->
@@ -141,6 +163,9 @@ object QuestCodexInitializer : Initializable {
             if (questId.isNotBlank()) {
                 handleQuestClick(player, session, questId)
             }
+        }
+        MenuSessionService.registerCustomCommandHandler("codex:tracked") { player, _, _, _, _ ->
+            openTrackedQuestsMenu(player)
         }
         plugin.logger.info("[QuestCodex] Registered GUI command handlers (codex:nav, codex:open, codex:quest)")
     }
@@ -243,19 +268,31 @@ object QuestCodexInitializer : Initializable {
         val questName = quest.displayName.get(player)
         when (status) {
             QuestStatus.ACTIVE -> {
-                val questRef = quest.ref()
-                val tracked = player isQuestTracked questRef
-                if (tracked) {
-                    player.unTrackQuest()
+                when (QuestCodexTrackingService.toggle(
+                    player,
+                    quest,
+                    QuestCodexConfig.multiTrackingEnabled,
+                    QuestCodexConfig.maxTrackedQuests,
+                )) {
+                    QuestCodexTrackingService.ToggleResult.UNTRACKED -> {
                     val msg = QuestCodexConfig.stoppedTrackingMessage.replace("{quest}", questName).parsePlaceholders(player)
                     if (msg.isNotBlank()) {
                         player.sendMessage(mm.deserialize(msg))
                     }
-                } else {
-                    player trackQuest questRef
+                    }
+                    QuestCodexTrackingService.ToggleResult.TRACKED -> {
                     val msg = QuestCodexConfig.nowTrackingMessage.replace("{quest}", questName).parsePlaceholders(player)
                     if (msg.isNotBlank()) {
                         player.sendMessage(mm.deserialize(msg))
+                    }
+                    }
+                    QuestCodexTrackingService.ToggleResult.LIMIT_REACHED -> {
+                        val msg = QuestCodexConfig.trackingLimitMessage
+                            .replace("{max}", QuestCodexConfig.maxTrackedQuests.toString())
+                            .parsePlaceholders(player)
+                        if (msg.isNotBlank()) {
+                            player.sendMessage(mm.deserialize(msg))
+                        }
                     }
                 }
             }
@@ -272,13 +309,21 @@ object QuestCodexInitializer : Initializable {
                 }
             }
         }
-        MenuSessionService.refresh(player)
+        if (session.definition.id == "codex:category:@tracked") {
+            // Rebuild the provider so the removed quest disappears immediately and
+            // remaining tracked quests compact toward the first configured slot.
+            openTrackedQuestsMenu(player, pushHistory = false)
+        } else {
+            MenuSessionService.refresh(player)
+        }
     }
 
     override suspend fun shutdown() {
         categoryMenuEntries.clear()
         questLoreEntries.clear()
         QuestCategoryRegistry.clear()
+        HandlerList.unregisterAll(playerLifecycleListener)
+        QuestCodexTrackingService.shutdown()
         QuestCodexConfig.reset()
     }
 
@@ -419,7 +464,11 @@ object QuestCodexInitializer : Initializable {
         val size = InventorySize.entries.getOrNull(rows - 1) ?: InventorySize.SIZE_54
 
         // 1. Index dynamic markers so they traverse parsing as ordinary tagged slots.
-        val markerType = if (isMainMenu) CodexButtonType.CATEGORY_SLOT.name else CodexButtonType.QUEST_SLOT.name
+        val markerType = when {
+            isMainMenu -> CodexButtonType.CATEGORY_SLOT.name
+            menuConfig.category.equals("@tracked", ignoreCase = true) -> CodexButtonType.TRACKED_QUEST_SLOT.name
+            else -> CodexButtonType.QUEST_SLOT.name
+        }
         val (indexedPool, markerCount) = indexDynamicMarkers(menuConfig.layoutPool.filterNotNull(), markerType)
 
         // 2. The sort button stays a fixed overlay (it must not scroll away).
@@ -564,6 +613,7 @@ object QuestCodexInitializer : Initializable {
                 else expandMarkerPositions(item).map { (px, py) ->
                     item.copy(
                         buttonType = "$markerType#${counter++}",
+                        buttonPrefix = "codex_button:",
                         x = px,
                         y = py,
                         direction = null,
@@ -659,6 +709,24 @@ object QuestCodexInitializer : Initializable {
         openMenuFromLayoutPool(player, menuConfig, quests, isMainMenu = false, pushHistory = pushHistory)
     }
 
+    fun openTrackedQuestsMenu(player: Player, pushHistory: Boolean = true) {
+        val menuConfig = categoryMenuEntries["@tracked"]
+        if (menuConfig == null || !menuConfig.usesLayoutPool) {
+            plugin.logger.warning("[QuestCodex] No category_menu with category '@tracked' is configured.")
+            return
+        }
+        val quests = QuestCodexTrackingService.trackedQuestIds(player)
+            .mapNotNull { Query.findById<QuestEntry>(it) }
+        val syntheticCategory = QuestCategoryRegistry.register(
+            name = "@tracked",
+            title = menuConfig.title.ifBlank { "<gold>Tracked quests" },
+            rows = menuConfig.rows,
+        )
+        syntheticCategory.quests.clear()
+        syntheticCategory.quests.addAll(quests.map { it.ref() })
+        openMenuFromLayoutPool(player, menuConfig, quests, isMainMenu = false, pushHistory = pushHistory)
+    }
+
     // ── Icon building ──
 
     private fun buildCategoryIcon(player: Player, category: QuestCategory): ItemStack {
@@ -726,7 +794,13 @@ object QuestCodexInitializer : Initializable {
 
         // Track hint
         if (status == QuestStatus.ACTIVE) {
-            loreLines.add(QuestCodexConfig.questTrackHint)
+            loreLines.add(
+                if (QuestCodexTrackingService.isTracked(player, quest.id)) {
+                    QuestCodexConfig.questUntrackHint
+                } else {
+                    QuestCodexConfig.questTrackHint
+                }
+            )
         }
 
         meta.lore(loreLines.flatMap { it.split("\n") }.map { it.parsePlaceholders(player).asMiniWithoutItalic() })

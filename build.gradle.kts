@@ -8,6 +8,10 @@ version = "2.5"
 
 val omniGuiVersion = "0.9"
 
+base {
+    archivesName.set("Typewriter-QuestCodexExtension-Public")
+}
+
 repositories {
     mavenCentral()
     maven("https://repo.bluecolored.de/releases")

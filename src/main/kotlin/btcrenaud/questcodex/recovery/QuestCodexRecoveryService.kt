@@ -36,6 +36,7 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.koin.java.KoinJavaComponent
+import java.util.logging.Level
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -114,13 +115,26 @@ object QuestCodexRecoveryService {
 
     private suspend fun load() {
         val entry = artifact ?: return
-        val manager = KoinJavaComponent.get<AssetManager>(AssetManager::class.java)
-        if (!manager.containsAsset(entry)) return
-        val raw = manager.fetchStringAsset(entry) ?: return
-        val now = System.currentTimeMillis()
-        RecoverySnapshotCodec.decode(raw, now).forEach { snapshot ->
-            val playerId = runCatching { UUID.fromString(snapshot.playerId) }.getOrNull() ?: return@forEach
-            snapshots[playerId] = snapshot
+        try {
+            val manager = KoinJavaComponent.get<AssetManager>(AssetManager::class.java)
+            if (!manager.containsAsset(entry)) {
+                plugin.logger.info("[QuestCodex Recovery] No recovery artifact found at ${entry.path}")
+                return
+            }
+            val raw = manager.fetchStringAsset(entry) ?: return
+            val now = System.currentTimeMillis()
+            val loaded = RecoverySnapshotCodec.decode(raw, now)
+            loaded.forEach { snapshot ->
+                val playerId = runCatching { UUID.fromString(snapshot.playerId) }.getOrNull() ?: return@forEach
+                snapshots[playerId] = snapshot
+            }
+            plugin.logger.info("[QuestCodex Recovery] Loaded ${loaded.size} snapshot(s) from ${entry.path}")
+        } catch (error: Throwable) {
+            plugin.logger.log(
+                Level.SEVERE,
+                "[QuestCodex Recovery] Failed to load ${entry.path}: ${error.message}",
+                error,
+            )
         }
     }
 
@@ -267,8 +281,17 @@ object QuestCodexRecoveryService {
                 val version = mutationVersion.get()
                 val now = System.currentTimeMillis()
                 val active = snapshots.values.filter { it.expiresAt > now }
-                manager.storeStringAsset(entry, RecoverySnapshotCodec.encode(active))
-                persistedVersion.set(version)
+                try {
+                    manager.storeStringAsset(entry, RecoverySnapshotCodec.encode(active))
+                    persistedVersion.set(version)
+                } catch (error: Throwable) {
+                    plugin.logger.log(
+                        Level.SEVERE,
+                        "[QuestCodex Recovery] Failed to persist ${entry.path}: ${error.message}",
+                        error,
+                    )
+                    return
+                }
             }
         }
     }

@@ -1,6 +1,8 @@
 package btcrenaud.questcodex.entries
 
 import btcrenaud.gui.OpenGuiActionEntry
+import btcrenaud.gui.api.MenuViewData
+import btcrenaud.gui.api.MenuViewSupport
 import com.typewritermc.core.books.pages.Colors
 import com.typewritermc.core.entries.Ref
 import com.typewritermc.core.entries.emptyRef
@@ -9,6 +11,11 @@ import com.typewritermc.core.extension.annotations.Help
 import com.typewritermc.core.extension.annotations.Placeholder
 import com.typewritermc.core.extension.annotations.Colored
 import com.typewritermc.engine.paper.entry.ManifestEntry
+import com.typewritermc.engine.paper.entry.Criteria
+import com.typewritermc.engine.paper.entry.Modifier
+import com.typewritermc.engine.paper.entry.TriggerableEntry
+import com.typewritermc.engine.paper.entry.entries.ActionEntry
+import com.typewritermc.engine.paper.entry.entries.ActionTrigger
 import com.typewritermc.engine.paper.utils.item.Item
 
 /**
@@ -46,6 +53,9 @@ enum class SortModeConfig {
 class CategoryMenuEntry(
     override val id: String = "",
     override val name: String = "",
+    override val criteria: List<Criteria> = emptyList(),
+    override val modifiers: List<Modifier> = emptyList(),
+    override val triggers: List<Ref<TriggerableEntry>> = emptyList(),
     @Help("Category this menu configuration applies to. Leave empty for main menu.")
     val category: String = "",
     @Help("Menu title shown to the player. Supports MiniMessage and PlaceholderAPI.")
@@ -58,7 +68,26 @@ class CategoryMenuEntry(
     val menu: Ref<OpenGuiActionEntry> = emptyRef(),
     @Help("Per-mode display overrides for the sort button. Define one entry per sort mode.")
     val sortDisplay: List<SortDisplayConfig> = emptyList(),
-) : ManifestEntry {
+    @Help("Addressable screens of this menu.")
+    val views: List<MenuViewData> = emptyList(),
+    @Help("View opened first. Empty = the first declared view.")
+    val defaultViewId: String? = null,
+    @Help("MiniMessage separator inserted between breadcrumb segments by the {breadcrumb} title token.")
+    @Colored
+    val breadcrumbSeparator: String = MenuViewSupport.DEFAULT_BREADCRUMB_SEPARATOR,
+    @Help("Shared OpenGui chassis whose layout pool and views are inherited before this menu's own values.")
+    val baseMenuId: String = "",
+    @Help("Push the previous view onto history when switching tabs.")
+    val pushHistoryOnViewSwitch: Boolean = false,
+) : ActionEntry {
+
+    override fun ActionTrigger.execute() {
+        if (category.isBlank()) {
+            btcrenaud.questcodex.QuestCodexInitializer.openMainMenu(player)
+        } else {
+            btcrenaud.questcodex.QuestCodexInitializer.openCategoryMenu(player, category)
+        }
+    }
 
     private val resolvedMenu: OpenGuiActionEntry? get() = menu.get()
     val layoutPool get() = resolvedMenu?.layoutPool ?: emptyList()

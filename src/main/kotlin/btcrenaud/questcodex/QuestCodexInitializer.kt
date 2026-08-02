@@ -30,6 +30,7 @@ import btcrenaud.questcodex.ui.CodexButtonResolverLayout
 import btcrenaud.questcodex.ui.CodexButtonType
 import btcrenaud.questcodex.ui.DynamicSlotContent
 import btcrenaud.questcodex.tracking.QuestCodexTrackingService
+import btcrenaud.questcodex.recovery.QuestCodexRecoveryService
 import com.typewritermc.core.entries.Query
 import com.typewritermc.core.extension.Initializable
 import com.typewritermc.engine.paper.entry.triggerEntriesFor
@@ -104,6 +105,17 @@ object QuestCodexInitializer : Initializable {
         if (trackingArtifact == null) {
             plugin.logger.warning(
                 "[QuestCodex] No trackingArtifact is configured; multi-tracking will be memory-only."
+            )
+        }
+        QuestCodexRecoveryService.initialize(
+            QuestCodexConfig.recoveryArtifact.get(),
+            QuestCodexConfig.recoveryEnabled,
+            QuestCodexConfig.recoveryRetentionSeconds,
+            QuestCodexConfig.recoveryRestoreDelayTicks,
+        )
+        if (QuestCodexConfig.recoveryEnabled && QuestCodexConfig.recoveryArtifact.get() == null) {
+            plugin.logger.warning(
+                "[QuestCodex] No recoveryArtifact is configured; dialogue/cinematic recovery is disabled."
             )
         }
         manager.registerEvents(playerLifecycleListener, plugin)
@@ -323,6 +335,7 @@ object QuestCodexInitializer : Initializable {
         questLoreEntries.clear()
         QuestCategoryRegistry.clear()
         HandlerList.unregisterAll(playerLifecycleListener)
+        QuestCodexRecoveryService.shutdown()
         QuestCodexTrackingService.shutdown()
         QuestCodexConfig.reset()
     }
@@ -458,6 +471,8 @@ object QuestCodexInitializer : Initializable {
         entries: List<*>,
         isMainMenu: Boolean,
         pushHistory: Boolean = true,
+        targetViewId: String? = null,
+        reopenOnView: (Player, String) -> Unit = { _, _ -> },
     ) {
         val ctx = com.typewritermc.core.interaction.context()
         val rows = menuConfig.rows.coerceIn(1, 6)
@@ -478,10 +493,18 @@ object QuestCodexInitializer : Initializable {
             if (sortPos != null) sortSlotPos = sortPos
             cleaned
         }
-        val pool = finalPool.associateBy { it.id }
+        val inherited = btcrenaud.gui.api.MenuViewSupport.inherit(
+            baseMenuId = menuConfig.baseMenuId,
+            ownPool = finalPool,
+            ownViews = menuConfig.views,
+            ownMainLayoutId = menuConfig.mainLayoutId,
+            ownDefaultViewId = menuConfig.defaultViewId,
+        )
+        val pool = inherited.pool
+        val rootLayoutId = inherited.mainLayoutId
 
-        val baseLayoutCleaned: MenuLayout = if (pool.containsKey(menuConfig.mainLayoutId)) {
-            LayoutParser.parse(player, ctx, menuConfig.guiType, size.slots, pool, pool[menuConfig.mainLayoutId]!!)
+        val baseLayoutCleaned: MenuLayout = if (rootLayoutId != null && pool.containsKey(rootLayoutId)) {
+            LayoutParser.parse(player, ctx, menuConfig.guiType, size.slots, pool, pool[rootLayoutId]!!)
         } else {
             EmptyLayout
         }
@@ -562,18 +585,36 @@ object QuestCodexInitializer : Initializable {
             ))
         }
 
-        val augmentedLayout = AugmentedSimpleLayout(inner = baseLayoutCleaned, dynamicSlots = dynamicSlots)
-        val resolvedLayout = CodexButtonResolverLayout(
-            inner = augmentedLayout,
+        fun decorate(base: MenuLayout): MenuLayout = CodexButtonResolverLayout(
+            inner = AugmentedSimpleLayout(inner = base, dynamicSlots = dynamicSlots),
             player = player,
             dynamicProvider = dynamicProvider,
         )
 
-        val rawTitle = if (isMainMenu) {
+        val fallbackTitle = if (isMainMenu) {
             menuConfig.title.ifBlank { "<dark_gray>Quest Codex" }
         } else {
             menuConfig.title.ifBlank { QuestCategoryRegistry.find(menuConfig.category)?.title ?: menuConfig.category }
-        }.parsePlaceholders(player)
+        }
+
+        val resolvedView = if (inherited.views.isEmpty()) null else
+            btcrenaud.gui.api.MenuViewSupport.resolve(
+                player = player,
+                context = ctx,
+                guiType = menuConfig.guiType,
+                totalSize = size.slots,
+                pool = pool,
+                mainLayoutId = rootLayoutId,
+                views = inherited.views,
+                defaultViewId = inherited.defaultViewId,
+                targetViewId = targetViewId,
+                baseTitle = fallbackTitle,
+                breadcrumbSeparator = menuConfig.breadcrumbSeparator,
+                decorate = ::decorate,
+            )
+
+        val resolvedLayout = resolvedView?.layout ?: decorate(baseLayoutCleaned)
+        val rawTitle = (resolvedView?.rawTitle ?: fallbackTitle).parsePlaceholders(player)
 
         val componentTitle = try {
             mm.deserialize(rawTitle)
@@ -593,6 +634,9 @@ object QuestCodexInitializer : Initializable {
                 onClick = QuestCodexConfig.soundOnClick,
                 onScroll = QuestCodexConfig.soundOnSwitch,
             ),
+            activeViewId = resolvedView?.activeViewId,
+            breadcrumb = resolvedView?.breadcrumb ?: emptyList(),
+            viewSwitcher = if (inherited.views.isEmpty()) null else reopenOnView,
         )
 
         MenuSessionService.register(player, definition, pushHistory = pushHistory)
@@ -660,7 +704,7 @@ object QuestCodexInitializer : Initializable {
      *   Categories are injected as dynamic slots at positions tagged "codex_button:CATEGORY_SLOT".
      * - **Legacy Mode**: Builds the menu programmatically (kept for backward compatibility).
      */
-    fun openMainMenu(player: Player) {
+    fun openMainMenu(player: Player, targetViewId: String? = null) {
         val categories = QuestCategoryRegistry.roots().filter { it.isVisible(player) }
         val menuConfig = categoryMenuEntries[""]
 
@@ -675,7 +719,20 @@ object QuestCodexInitializer : Initializable {
             return
         }
 
-        openMenuFromLayoutPool(player, menuConfig, categories, isMainMenu = true)
+        fun openOn(target: Player, viewId: String?, push: Boolean) {
+            openMenuFromLayoutPool(
+                target,
+                menuConfig,
+                categories,
+                isMainMenu = true,
+                pushHistory = push,
+                targetViewId = viewId,
+                reopenOnView = { next, nextViewId ->
+                    openOn(next, nextViewId, menuConfig.pushHistoryOnViewSwitch)
+                },
+            )
+        }
+        openOn(player, targetViewId, true)
     }
 
     /**
@@ -684,7 +741,12 @@ object QuestCodexInitializer : Initializable {
      * Uses the [CategoryMenuEntry] layout pool for full customization.
      * Quests are injected as dynamic slots at positions tagged "codex_button:QUEST_SLOT".
      */
-    fun openCategoryMenu(player: Player, categoryName: String, pushHistory: Boolean = true) {
+    fun openCategoryMenu(
+        player: Player,
+        categoryName: String,
+        pushHistory: Boolean = true,
+        targetViewId: String? = null,
+    ) {
         val category = QuestCategoryRegistry.find(categoryName)
         if (category == null) {
             plugin.logger.warning("[QuestCodex] Category '$categoryName' not found.")
@@ -706,7 +768,20 @@ object QuestCodexInitializer : Initializable {
             return
         }
 
-        openMenuFromLayoutPool(player, menuConfig, quests, isMainMenu = false, pushHistory = pushHistory)
+        fun openOn(target: Player, viewId: String?, push: Boolean) {
+            openMenuFromLayoutPool(
+                target,
+                menuConfig,
+                quests,
+                isMainMenu = false,
+                pushHistory = push,
+                targetViewId = viewId,
+                reopenOnView = { next, nextViewId ->
+                    openOn(next, nextViewId, menuConfig.pushHistoryOnViewSwitch)
+                },
+            )
+        }
+        openOn(player, targetViewId, pushHistory)
     }
 
     fun openTrackedQuestsMenu(player: Player, pushHistory: Boolean = true) {
@@ -724,7 +799,20 @@ object QuestCodexInitializer : Initializable {
         )
         syntheticCategory.quests.clear()
         syntheticCategory.quests.addAll(quests.map { it.ref() })
-        openMenuFromLayoutPool(player, menuConfig, quests, isMainMenu = false, pushHistory = pushHistory)
+        fun openOn(target: Player, viewId: String?, push: Boolean) {
+            openMenuFromLayoutPool(
+                target,
+                menuConfig,
+                quests,
+                isMainMenu = false,
+                pushHistory = push,
+                targetViewId = viewId,
+                reopenOnView = { next, nextViewId ->
+                    openOn(next, nextViewId, menuConfig.pushHistoryOnViewSwitch)
+                },
+            )
+        }
+        openOn(player, null, pushHistory)
     }
 
     // ── Icon building ──

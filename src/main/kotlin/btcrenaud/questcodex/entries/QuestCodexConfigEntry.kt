@@ -34,6 +34,14 @@ class QuestCodexConfigEntry(
     val maxTrackedQuests: Int = 5,
     @Help("Artifact used to persist each player's tracked quest ids and their tracking order.")
     val trackingArtifact: Ref<QuestCodexTrackingArtifactEntry> = emptyRef(),
+    @Help("Enable safe recovery of active Typewriter dialogues and cinematics after a disconnect.")
+    val recoveryEnabled: Boolean = true,
+    @Help("Artifact used to persist active dialogue and cinematic recovery snapshots.")
+    val recoveryArtifact: Ref<QuestCodexRecoveryArtifactEntry> = emptyRef(),
+    @Help("How long an interrupted interaction remains restorable, in seconds.")
+    val recoveryRetentionSeconds: Long = 120,
+    @Help("Ticks to wait after join before restoring an interrupted interaction.")
+    val recoveryRestoreDelayTicks: Long = 2,
 
     @Help("Message shown when a player starts tracking a quest. Placeholders: {quest}")
     @Placeholder @Colored
@@ -85,6 +93,14 @@ object QuestCodexConfig {
         private set
     var trackingArtifact: Ref<QuestCodexTrackingArtifactEntry> = emptyRef()
         private set
+    var recoveryEnabled: Boolean = true
+        private set
+    var recoveryArtifact: Ref<QuestCodexRecoveryArtifactEntry> = emptyRef()
+        private set
+    var recoveryRetentionSeconds: Long = 120
+        private set
+    var recoveryRestoreDelayTicks: Long = 2
+        private set
 
     var nowTrackingMessage: String = "<green>Now tracking: {quest}</green>"
         private set
@@ -117,6 +133,10 @@ object QuestCodexConfig {
         multiTrackingEnabled = true
         maxTrackedQuests = 5
         trackingArtifact = emptyRef()
+        recoveryEnabled = true
+        recoveryArtifact = emptyRef()
+        recoveryRetentionSeconds = 120
+        recoveryRestoreDelayTicks = 2
         nowTrackingMessage = "<green>Now tracking: {quest}</green>"
         stoppedTrackingMessage = "<gray>No longer tracking: {quest}</gray>"
         questInactiveMessage = "<gold>{quest} — Start this quest!</gold>"
@@ -139,6 +159,10 @@ object QuestCodexConfig {
         multiTrackingEnabled = entry.multiTrackingEnabled
         maxTrackedQuests = entry.maxTrackedQuests.coerceAtLeast(1)
         trackingArtifact = entry.trackingArtifact
+        recoveryEnabled = entry.recoveryEnabled
+        recoveryArtifact = entry.recoveryArtifact
+        recoveryRetentionSeconds = entry.recoveryRetentionSeconds.coerceIn(10, 86_400)
+        recoveryRestoreDelayTicks = entry.recoveryRestoreDelayTicks.coerceIn(1, 20)
         nowTrackingMessage = entry.nowTrackingMessage
         stoppedTrackingMessage = entry.stoppedTrackingMessage
         questInactiveMessage = entry.questInactiveMessage

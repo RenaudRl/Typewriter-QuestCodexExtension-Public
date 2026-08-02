@@ -4,9 +4,9 @@ plugins {
 }
 
 group = "btcrenaud"
-version = "2.5"
+version = "2.6"
 
-val omniGuiVersion = "0.9"
+val omniGuiVersion = "0.10"
 
 base {
     archivesName.set("Typewriter-QuestCodexExtension-Public")
@@ -31,6 +31,8 @@ repositories {
 }
 
 dependencies {
+    testImplementation(kotlin("test"))
+    testImplementation("com.google.code.gson:gson:2.13.1")
     compileOnly("de.bluecolored:bluemap-api:2.7.3")
     compileOnly("com.flowpowered:flow-math:1.0.3")
     compileOnly("btcrenaud:Typewriter-OmniGUIExtension:v$omniGuiVersion@jar")
@@ -57,5 +59,9 @@ typewriter {
 
 kotlin {
     jvmToolchain(21)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 

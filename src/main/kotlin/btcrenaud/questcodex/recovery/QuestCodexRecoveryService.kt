@@ -51,6 +51,11 @@ object QuestCodexRecoveryService {
 
     private val snapshots = ConcurrentHashMap<UUID, RecoverySnapshot>()
     private val temporalPages = ConcurrentHashMap<UUID, String>()
+    /**
+     * Typewriter tears down active interactions after PlayerQuitEvent. Those
+     * teardown events must not erase the snapshot captured for the disconnect.
+     */
+    private val disconnectedPlayers = ConcurrentHashMap.newKeySet<UUID>()
     private val restoringPlayers = ConcurrentHashMap.newKeySet<UUID>()
     private val saveMutex = Mutex()
     private val mutationVersion = AtomicLong()
@@ -99,6 +104,7 @@ object QuestCodexRecoveryService {
         scope = null
         snapshots.clear()
         temporalPages.clear()
+        disconnectedPlayers.clear()
         restoringPlayers.clear()
         artifact = null
         enabled = false
@@ -151,6 +157,15 @@ object QuestCodexRecoveryService {
            plugin.logger.info("[QuestCodex Recovery] Snapshot dialogue: ${player.name} entry=${dialogue.id}")
            capture(playerId, RecoveryInteraction.Dialogue(dialogue.id))
            return
+        }
+
+        // Depending on the event ordering, Typewriter may already have torn
+        // down the interaction before PlayerQuitEvent reaches this listener.
+        // Keep the latest event-driven snapshot instead of replacing it with
+        // an empty one in that case.
+        if (snapshots.containsKey(playerId)) {
+            plugin.logger.info("[QuestCodex Recovery] Keeping latest snapshot for ${player.name} after interaction teardown")
+            return
         }
 
         plugin.logger.info("[QuestCodex Recovery] No interaction to snapshot for ${player.name}, clearing")
@@ -278,6 +293,7 @@ object QuestCodexRecoveryService {
         @EventHandler
         fun onCinematicEnd(event: AsyncCinematicEndEvent) {
             temporalPages.remove(event.player.uniqueId)
+            if (event.player.uniqueId in disconnectedPlayers) return
             if (snapshots[event.player.uniqueId]?.interaction is RecoveryInteraction.Temporal) {
                 capture(event.player.uniqueId, null)
             }
@@ -299,6 +315,7 @@ object QuestCodexRecoveryService {
 
         @EventHandler
         fun onDialogueEnd(event: AsyncDialogueEndEvent) {
+            if (event.player.uniqueId in disconnectedPlayers) return
             if (snapshots[event.player.uniqueId]?.interaction is RecoveryInteraction.Dialogue) {
                 capture(event.player.uniqueId, null)
             }
@@ -306,12 +323,24 @@ object QuestCodexRecoveryService {
 
         @EventHandler(priority = EventPriority.LOWEST)
         fun onQuit(event: PlayerQuitEvent) {
+            disconnectedPlayers.add(event.player.uniqueId)
             captureCurrent(event.player)
         }
 
         @EventHandler
         fun onJoin(event: PlayerJoinEvent) {
-            event.player.scheduler.runDelayed(plugin, { restore(event.player) }, null, restoreDelayTicks)
+            event.player.scheduler.runDelayed(
+                plugin,
+                {
+                    try {
+                        restore(event.player)
+                    } finally {
+                        disconnectedPlayers.remove(event.player.uniqueId)
+                    }
+                },
+                null,
+                restoreDelayTicks,
+            )
         }
     }
 }

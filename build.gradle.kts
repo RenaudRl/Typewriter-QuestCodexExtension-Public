@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "btcrenaud"
-version = "2.6"
+version = "2.7"
 
 val omniGuiVersion = "0.10"
 

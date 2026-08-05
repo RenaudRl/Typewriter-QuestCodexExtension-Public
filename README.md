@@ -87,10 +87,39 @@ set it to a MiniMessage string or a resource-pack glyph, for example
 The block and beacon layers use a centered transformation pivot. Beacon rotation is
 performed around the center of its footprint while keeping the beam vertical.
 
-Multiple waypoints are supported by creating multiple `quest_codex_waypoint`
-entries. Each entry can reference a different tracked objective; tracking two
-quests therefore produces two independent text displays. The bundled public test
-page contains a second quest/objective/waypoint for this scenario.
+### Display modes
+
+`displayMode` controls how markers are placed, and any layer may override it with
+its own `mode` field:
+
+| Mode | Behaviour |
+| --- | --- |
+| `HUD_LOCKED` | Default. Pinned in front of the player's camera, limited to `hudVisibilityAngle`. |
+| `WORLD_DIRECTIONAL` | Projected onto a sphere of radius `projectionRadius` around the player's eyes, along the true direction of the target. Looking at a marker means looking at its destination, so no visibility cone applies. |
+| `TARGET_ANCHORED` | Placed on the target itself, within `targetViewDistance`. |
+| `ADAPTIVE` | `TARGET_ANCHORED` up close, easing onto the projection sphere over `adaptiveTransitionBand` blocks. |
+
+With `constantApparentSize` enabled, a marker pulled closer than the projection
+radius is scaled down so every marker reads at the same on-screen size regardless
+of how far its destination is. `declutterAngle` and `declutterSpacing` stack
+markers vertically when several destinations share a line of sight.
+
+### Multiple targets
+
+A single `quest_codex_waypoint` entry now renders several destinations at once.
+The `tracked_objective_waypoint_target` selection accepts `ALL` (every tracked
+locatable objective) and `ONE_PER_QUEST` (the best objective of each tracked
+quest), both capped by `maxTargets`. Multi-tracking is read from QuestCodex's own
+tracking service, so secondary quests are no longer ignored.
+
+Creating several `quest_codex_waypoint` entries is still supported when different
+destinations need different styling.
+
+### Locator bar
+
+`quest_codex_locator_bar` renders the same resolved targets as vanilla locator bar
+dots (Minecraft 1.21.6+). It spawns no entity, so it pairs with a 3D waypoint
+rather than replacing it.
 
 The display entities are packet-only and are updated on the player's scheduler;
 they are never persisted as server entities. A layer can be enabled per player by

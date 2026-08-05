@@ -31,6 +31,45 @@ enum class TrackedObjectiveSelection {
     HIGHEST_PRIORITY,
     FIRST,
     CLOSEST,
+
+    /** Every tracked locatable objective, best priority first, capped by `maxTargets`. */
+    ALL,
+
+    /** The best objective of each tracked quest, capped by `maxTargets`. */
+    ONE_PER_QUEST,
+}
+
+/**
+ * How a waypoint is placed in the world.
+ *
+ * `HUD_LOCKED` is the historical behaviour and stays the default so existing
+ * pages keep rendering exactly as before.
+ */
+enum class WaypointDisplayMode {
+    /** Pinned in front of the player's eyes, restricted to `hudVisibilityAngle`. */
+    HUD_LOCKED,
+
+    /**
+     * Projected onto a sphere around the player's eyes, along the true direction
+     * of the target. Looking at the marker means looking at the target, so no
+     * visibility cone is applied.
+     */
+    WORLD_DIRECTIONAL,
+
+    /** Placed on the target itself. Only visible within the client's entity range. */
+    TARGET_ANCHORED,
+
+    /** `TARGET_ANCHORED` up close, `WORLD_DIRECTIONAL` further away, blended in between. */
+    ADAPTIVE,
+}
+
+/** Per-layer placement override. `INHERIT` uses the entry's `displayMode`. */
+enum class WaypointLayerMode {
+    INHERIT,
+    HUD_LOCKED,
+    WORLD_DIRECTIONAL,
+    TARGET_ANCHORED,
+    ADAPTIVE,
 }
 
 enum class BeaconMode {
@@ -79,8 +118,10 @@ data class WaypointTextLayer(
     val text: Var<String> = ConstVar("<white>{distance}</white>"),
     @Help("Position relative to the selected anchor.")
     val offset: Vector = Vector(0.0, 0.0, 0.0),
-    @Help("HUD or target placement.")
+    @Help("HUD or target placement. Only used when the resolved display mode is HUD_LOCKED.")
     val placement: WaypointLayerPlacement = WaypointLayerPlacement.HUD,
+    @Help("Overrides the entry's display mode for this layer.")
+    val mode: WaypointLayerMode = WaypointLayerMode.INHERIT,
     @Help("Display scale.")
     val scale: Float = 1.0f,
     @Help("Maximum text line width.")
@@ -107,8 +148,10 @@ data class WaypointBlockLayer(
     val material: Var<Material> = ConstVar(Material.BEACON),
     @Help("Position relative to the selected anchor.")
     val offset: Vector = Vector(0.0, 0.0, 0.0),
-    @Help("HUD or target placement.")
+    @Help("HUD or target placement. Only used when the resolved display mode is HUD_LOCKED.")
     val placement: WaypointLayerPlacement = WaypointLayerPlacement.TARGET,
+    @Help("Overrides the entry's display mode for this layer.")
+    val mode: WaypointLayerMode = WaypointLayerMode.INHERIT,
     @Help("Display scale.")
     val scale: Float = 1.0f,
 ) : WaypointLayer
@@ -150,8 +193,24 @@ class QuestCodexWaypointEntry(
     val icon: Var<String> = ConstVar(""),
     @Help("Display layers rendered for the target.")
     val layers: List<WaypointLayer> = listOf(WaypointTextLayer()),
+    @Help("How waypoints are placed in the world. Layers may override this individually.")
+    val displayMode: WaypointDisplayMode = WaypointDisplayMode.HUD_LOCKED,
+    @Help("Maximum number of simultaneous targets rendered. Only selections that yield several targets are affected.")
+    val maxTargets: Int = 5,
+    @Help("Sphere radius, in blocks, used by WORLD_DIRECTIONAL and ADAPTIVE placement.")
+    val projectionRadius: Double = 12.0,
+    @Help("Keep a constant apparent size when a projected marker sits closer than the projection radius.")
+    val constantApparentSize: Boolean = true,
+    @Help("Blend distance above nearTargetDistance over which ADAPTIVE moves from the target to the projection sphere.")
+    val adaptiveTransitionBand: Double = 4.0,
+    @Help("Minimum angular gap, in degrees, kept between two projected markers. Set to zero to disable decluttering.")
+    val declutterAngle: Double = 4.0,
+    @Help("Vertical spacing, in blocks, applied to projected markers that would otherwise overlap.")
+    val declutterSpacing: Double = 0.6,
     @Help("Refresh interval in ticks. One tick gives the smoothest HUD tracking.")
     val refreshTicks: Int = 1,
+    @Help("Client-side interpolation of marker movement, in ticks. Raise it if markers stutter while running or flying; lower it for a more immediate response.")
+    val interpolationTicks: Int = 2,
     @Help("Optional hard-hide distance. Set to zero to keep the text visible above the target when close.")
     val hideWithinDistance: Double = 0.0,
     @Help("Distance within which text layers move above the target instead of staying in front of the player.")

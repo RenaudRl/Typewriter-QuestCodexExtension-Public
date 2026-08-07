@@ -4,9 +4,9 @@ plugins {
 }
 
 group = "btcrenaud"
-version = "2.7"
+version = "2.8"
 
-val omniGuiVersion = "0.10"
+val omniGuiVersion = "0.11"
 
 base {
     archivesName.set("Typewriter-QuestCodexExtension-Public")
@@ -17,7 +17,6 @@ repositories {
     maven("https://repo.bluecolored.de/releases")
     maven("https://maven.typewritermc.com/beta/")
     maven("https://maven.typewritermc.com/external")
-    mavenLocal()
     ivy {
         name = "omniGuiGitHubReleases"
         url = uri("https://github.com/RenaudRl/Typewriter-OmniGUIExtension/releases/download")
@@ -60,6 +59,10 @@ typewriter {
 kotlin {
     jvmToolchain(21)
 }
+
+// The engine and QuestExtension are compileOnly (the server provides them at runtime), which left
+// them off the test classpath entirely. Tests need them to compile against the same types.
+configurations["testImplementation"].extendsFrom(configurations["compileOnly"])
 
 tasks.test {
     useJUnitPlatform()

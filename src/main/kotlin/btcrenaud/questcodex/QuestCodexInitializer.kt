@@ -29,6 +29,7 @@ import btcrenaud.questcodex.ui.AugmentedSimpleLayout
 import btcrenaud.questcodex.ui.CodexButtonResolverLayout
 import btcrenaud.questcodex.ui.CodexButtonType
 import btcrenaud.questcodex.ui.DynamicSlotContent
+import btcrenaud.questcodex.advancement.AdvancementDatapackService
 import btcrenaud.questcodex.tracking.QuestCodexTrackingService
 import btcrenaud.questcodex.recovery.QuestCodexRecoveryService
 import com.typewritermc.core.entries.Query
@@ -67,7 +68,29 @@ object QuestCodexInitializer : Initializable {
     enum class SortMode { ALL, NOT_STARTED, ACTIVE, COMPLETED }
 
     private val mm = MiniMessage.miniMessage()
-    private var currentSortMode: SortMode = SortMode.ALL
+
+    /** Sort mode per player — a single shared field let one player's sort reshuffle everyone's menu. */
+    private val sortModes = java.util.concurrent.ConcurrentHashMap<java.util.UUID, SortMode>()
+
+    private fun sortModeOf(player: Player): SortMode = sortModes[player.uniqueId] ?: SortMode.ALL
+
+    /**
+     * Page the codex itself owns for a player, over the *virtual* list of quests/categories that the
+     * indexed markers expose.
+     *
+     * Keyed by the menu definition id so re-opening another menu can never inherit a stale page.
+     */
+    private data class QuestPagination(val menuId: String, val pageCount: Int, val page: Int)
+
+    private val questPagination =
+        java.util.concurrent.ConcurrentHashMap<java.util.UUID, QuestPagination>()
+
+    /** Codex pagination for [menuId], or null when this menu is not paged by the codex. */
+    private fun paginationFor(player: Player, menuId: String): QuestPagination? =
+        questPagination[player.uniqueId]?.takeIf { it.menuId == menuId }
+
+    /** Current page for [menuId]; 0 when the codex does not own this menu's pagination. */
+    private fun pageFor(player: Player, menuId: String): Int = paginationFor(player, menuId)?.page ?: 0
 
     // ── Loaded data ──
     private val categoryMenuEntries = mutableMapOf<String, CategoryMenuEntry>()
@@ -149,6 +172,9 @@ object QuestCodexInitializer : Initializable {
         // ── Step 7: Initialize BlueMap integration ──
         BlueMapIntegrationService.initialize()
 
+        // ── Step 8: Write the advancement datapack ──
+        AdvancementDatapackService.initialize()
+
         plugin.logger.info("[QuestCodex] Initialized: ${QuestCategoryRegistry.all().size} categories, ${categoryMenuEntries.size} menu configs")
     }
 
@@ -188,25 +214,8 @@ object QuestCodexInitializer : Initializable {
     private fun handleCodexNav(player: Player, session: MenuSessionService.ActiveSession, action: CodexNavAction) {
         val layout = session.definition.layout
         when (action) {
-            CodexNavAction.PAGE_NEXT -> {
-                // Find PaginatedLayout and go to next page
-                val paginatedId = findFirstPaginatedId(layout)
-                if (paginatedId != null) {
-                    val current = session.pageStates[paginatedId] ?: 0
-                    session.pageStates[paginatedId] = current + 1
-                    MenuSessionService.refresh(player)
-                }
-            }
-            CodexNavAction.PAGE_PREV -> {
-                val paginatedId = findFirstPaginatedId(layout)
-                if (paginatedId != null) {
-                    val current = session.pageStates[paginatedId] ?: 0
-                    if (current > 0) {
-                        session.pageStates[paginatedId] = current - 1
-                        MenuSessionService.refresh(player)
-                    }
-                }
-            }
+            CodexNavAction.PAGE_NEXT -> turnPage(player, session, layout, +1)
+            CodexNavAction.PAGE_PREV -> turnPage(player, session, layout, -1)
             CodexNavAction.SCROLL_UP -> MenuSessionService.scroll(player, 0, -1)
             CodexNavAction.SCROLL_DOWN -> MenuSessionService.scroll(player, 0, 1)
             CodexNavAction.SCROLL_LEFT -> MenuSessionService.scroll(player, -1, 0)
@@ -226,7 +235,7 @@ object QuestCodexInitializer : Initializable {
             }
             CodexNavAction.CLOSE -> player.closeInventory()
             CodexNavAction.SORT -> {
-                currentSortMode = when (currentSortMode) {
+                sortModes[player.uniqueId] = when (sortModeOf(player)) {
                     SortMode.ALL -> SortMode.NOT_STARTED
                     SortMode.NOT_STARTED -> SortMode.ACTIVE
                     SortMode.ACTIVE -> SortMode.COMPLETED
@@ -250,19 +259,57 @@ object QuestCodexInitializer : Initializable {
     }
 
     /**
-     * Finds the first PaginatedLayout id in the layout tree.
+     * Turns the page of whichever system actually owns this menu's pagination.
+     *
+     * The codex pages a *virtual* list (120 quests over 28 markers), so it cannot simply defer to
+     * the engine's [PaginatedLayout], which pages already-parsed slots. Whenever the menu exposes
+     * markers the codex owns the page; otherwise the engine's paginated layout does. Exactly one of
+     * the two runs, so the marker offset and the viewport can no longer drift apart.
      */
-    private fun findFirstPaginatedId(layout: MenuLayout): String? {
-        if (layout is PaginatedLayout && layout.id != null) return layout.id
+    private fun turnPage(
+        player: Player,
+        session: MenuSessionService.ActiveSession,
+        layout: MenuLayout,
+        delta: Int,
+    ) {
+        val menuId = session.definition.id
+        val pagination = paginationFor(player, menuId)
+        if (pagination != null) {
+            val target = (pagination.page + delta).coerceIn(0, (pagination.pageCount - 1).coerceAtLeast(0))
+            if (target == pagination.page) return
+            questPagination[player.uniqueId] = pagination.copy(page = target)
+            MenuSessionService.refresh(player)
+            return
+        }
+
+        val paginated = findFirstPaginated(layout) ?: return
+        val paginatedId = paginated.id ?: return
+        val current = session.pageStates[paginatedId] ?: 0
+        // Clamped both ways: PAGE_NEXT used to increment without an upper bound, leaving the
+        // viewport on a page index past the end where every slot renders empty.
+        val target = (current + delta).coerceIn(0, (paginated.pages.size - 1).coerceAtLeast(0))
+        if (target == current) return
+        session.pageStates[paginatedId] = target
+        MenuSessionService.refresh(player)
+    }
+
+    /**
+     * Finds the first identified PaginatedLayout in the layout tree.
+     *
+     * Returns the layout rather than just its id so callers can clamp against its real page count
+     * instead of stepping blindly past the last page.
+     */
+    private fun findFirstPaginated(layout: MenuLayout): PaginatedLayout? {
+        if (layout is PaginatedLayout && layout.id != null) return layout
         when (layout) {
             is CompositeLayout -> {
                 for (child in layout.children) {
-                    val id = findFirstPaginatedId(child)
-                    if (id != null) return id
+                    val found = findFirstPaginated(child)
+                    if (found != null) return found
                 }
             }
-            is ScrollableLayout -> return findFirstPaginatedId(layout.layout)
-            else -> layout.innerLayout?.let { return findFirstPaginatedId(it) }
+            is ScrollableLayout -> return findFirstPaginated(layout.layout)
+            else -> layout.innerLayout?.let { return findFirstPaginated(it) }
         }
         return null
     }
@@ -331,6 +378,8 @@ object QuestCodexInitializer : Initializable {
     }
 
     override suspend fun shutdown() {
+        questPagination.clear()
+        sortModes.clear()
         categoryMenuEntries.clear()
         questLoreEntries.clear()
         QuestCategoryRegistry.clear()
@@ -486,6 +535,19 @@ object QuestCodexInitializer : Initializable {
         }
         val (indexedPool, markerCount) = indexDynamicMarkers(menuConfig.layoutPool.filterNotNull(), markerType)
 
+        val menuId =
+            if (isMainMenu) "codex:main" else "codex:category:${menuConfig.category.lowercase()}"
+
+        // Claim pagination only when this menu actually has markers to page over — with none, the
+        // engine's PaginatedLayout stays in charge. Everything past the first page used to be
+        // unreachable here: the providers below ignored the page entirely.
+        if (markerCount > 0) {
+            val pageCount = ((entries.size + markerCount - 1) / markerCount).coerceAtLeast(1)
+            questPagination[player.uniqueId] = QuestPagination(menuId, pageCount, page = 0)
+        } else {
+            questPagination.remove(player.uniqueId)
+        }
+
         // 2. The sort button stays a fixed overlay (it must not scroll away).
         var sortSlotPos: Pair<Int, Int>? = null
         val finalPool = indexedPool.map { layoutData ->
@@ -514,11 +576,12 @@ object QuestCodexInitializer : Initializable {
         if (isMainMenu) {
             @Suppress("UNCHECKED_CAST")
             val categories = entries as List<QuestCategory>
-            if (categories.size > markerCount) {
-                plugin.logger.warning("[QuestCodex] Main menu has ${categories.size} categories but only $markerCount CATEGORY_SLOT markers.")
+            if (markerCount == 0 && categories.isNotEmpty()) {
+                plugin.logger.warning("[QuestCodex] Main menu has ${categories.size} categories but no CATEGORY_SLOT marker.")
             }
             dynamicProvider = { index ->
-                categories.getOrNull(index)?.let { category ->
+                val offset = pageFor(player, menuId) * markerCount
+                categories.getOrNull(offset + index)?.let { category ->
                     DynamicSlotContent(
                         item = buildCategoryIcon(player, category),
                         commands = listOf("codex:open ${category.name}"),
@@ -529,11 +592,11 @@ object QuestCodexInitializer : Initializable {
             @Suppress("UNCHECKED_CAST")
             val questEntries = entries as List<QuestEntry>
             val category = QuestCategoryRegistry.find(menuConfig.category)
-            if (questEntries.size > markerCount) {
-                plugin.logger.warning("[QuestCodex] Category '${menuConfig.category}' has ${questEntries.size} quests but only $markerCount QUEST_SLOT markers.")
+            if (markerCount == 0 && questEntries.isNotEmpty()) {
+                plugin.logger.warning("[QuestCodex] Category '${menuConfig.category}' has ${questEntries.size} quests but no QUEST_SLOT marker.")
             }
             dynamicProvider = { index ->
-                val quest = questEntries.getOrNull(index)
+                val quest = questEntries.getOrNull(pageFor(player, menuId) * markerCount + index)
                 if (quest == null || category == null) null
                 else DynamicSlotContent(
                     item = buildQuestIcon(player, quest, category),
@@ -546,7 +609,7 @@ object QuestCodexInitializer : Initializable {
 
         // Build dynamic sort button if SORT_SLOT was found
         if (sortSlotPos != null) {
-            val sortModeConfig = when (currentSortMode) {
+            val sortModeConfig = when (sortModeOf(player)) {
                 SortMode.ALL -> SortModeConfig.ALL
                 SortMode.NOT_STARTED -> SortModeConfig.NOT_STARTED
                 SortMode.ACTIVE -> SortModeConfig.ACTIVE
@@ -559,7 +622,7 @@ object QuestCodexInitializer : Initializable {
                 CodexNavDefaults.defaultItem(CodexNavAction.SORT).build(player)
             }
             val sortLabel = display?.label?.takeIf { it.isNotBlank() }
-                ?: when (currentSortMode) {
+                ?: when (sortModeOf(player)) {
                     SortMode.ALL -> "<yellow>📋 All quests"
                     SortMode.NOT_STARTED -> "<white>📋 Not started"
                     SortMode.ACTIVE -> "<green>📋 In progress"
@@ -623,7 +686,7 @@ object QuestCodexInitializer : Initializable {
         }
 
         val definition = MenuDefinition(
-            id = if (isMainMenu) "codex:main" else "codex:category:${menuConfig.category.lowercase()}",
+            id = menuId,
             type = menuConfig.guiType,
             title = componentTitle,
             rawTitle = rawTitle,
@@ -756,7 +819,7 @@ object QuestCodexInitializer : Initializable {
         val menuConfig = categoryMenuEntries[categoryName.lowercase()]
         val allQuests = category.getVisibleQuests(player)
         // Filter by current sort mode
-        val quests = when (currentSortMode) {
+        val quests = when (sortModeOf(player)) {
             SortMode.ALL -> allQuests
             SortMode.NOT_STARTED -> allQuests.filter { it.questStatus(player) == QuestStatus.INACTIVE }
             SortMode.ACTIVE -> allQuests.filter { it.questStatus(player) == QuestStatus.ACTIVE }
@@ -914,7 +977,9 @@ object QuestCodexInitializer : Initializable {
                     QuestStatus.COMPLETED -> !(display?.completed?.hideQuest ?: false)
                 }
             }
-            .sortedWith(compareBy({ questOrders[it.id] ?: Int.MAX_VALUE }, { it.name }))
+        // No sort here on purpose: allQuests() is already in the configured order, and filtering
+        // preserves it. Re-sorting on `name` made the order depend on display text, and the
+        // per-status filtering above meant a quest changing state could reshuffle the whole menu.
     }
 
     private fun QuestLoreEntry.toAdditionalLore(): QuestAdditionalLore = QuestAdditionalLore(

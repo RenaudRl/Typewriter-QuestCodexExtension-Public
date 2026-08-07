@@ -36,7 +36,11 @@ class QuestAssignmentEntry(
     val category: String = "",
     @Help("Quests to assign to this category.")
     val questRefs: List<Ref<QuestEntry>> = emptyList(),
-    @Help("Display order for each quest (aligned with questRefs). Lower numbers appear first.")
+    @Help(
+        "Display order for each quest, aligned index-by-index with questRefs. Lower numbers appear " +
+            "first. Optional: leave it empty and quests keep the order you listed them in. Ordered " +
+            "quests always come before unordered ones, and the order is the same for every player."
+    )
     val orders: List<Int> = emptyList(),
     @Help("Override: item shown when the quest has not started.")
     @ContentEditor(HoldingItemContentMode::class)

@@ -186,10 +186,11 @@ object QuestCategoryRegistry {
         if (questRef.id.isNotBlank() && !category.quests.contains(questRef)) {
             category.quests.add(questRef)
         }
+        // Merge, never erase: several assignment entries may list the same quest, and only some of
+        // them carry an `orders` list. Clearing on `order == null` let a later entry silently drop
+        // an order set by an earlier one, which is one way the display order drifted between reloads.
         if (order != null) {
             category.questOrders[quest.id] = order
-        } else {
-            category.questOrders.remove(quest.id)
         }
         overrides?.takeIf { it.hasOverrides() }?.let { newOverrides ->
             val existing = category.questItems[quest.id]
@@ -204,21 +205,58 @@ object QuestCategoryRegistry {
         }
     }
 
-    fun all(): Collection<QuestCategory> = categories.values.sortedWith(
-        compareBy({ if (it.order == 0) Int.MAX_VALUE else it.order }, { it.title })
-    )
+    fun all(): Collection<QuestCategory> = categories.values.sortedWith(CATEGORY_ORDER)
 
-    fun roots(): Collection<QuestCategory> = categories.values.filter { it.parent == null }.sortedWith(
-        compareBy({ if (it.order == 0) Int.MAX_VALUE else it.order }, { it.title })
-    )
+    fun roots(): Collection<QuestCategory> =
+        categories.values.filter { it.parent == null }.sortedWith(CATEGORY_ORDER)
 
     fun clear() {
         categories.clear()
     }
 }
 
-fun QuestCategory.allQuests(): List<QuestEntry> =
-    (quests.mapNotNull { it.get() } + subCategories.flatMap { it.allQuests() }).distinct()
+/**
+ * Total order over categories: explicit [QuestCategory.order] first, then the category *name*.
+ *
+ * The tiebreak used to be `title`, which is display text — it carries placeholders and translations,
+ * so the same server could order its categories differently depending on who was looking.
+ */
+internal val CATEGORY_ORDER: Comparator<QuestCategory> =
+    compareBy({ if (it.order == 0) Int.MAX_VALUE else it.order }, { it.name })
+
+/**
+ * Rank of a quest inside the category that owns it.
+ *
+ * Quests carrying an explicit order come first, in that order. The rest keep their *declaration
+ * position* — the position of the ref in [QuestCategory.quests], which follows assignment-entry
+ * order — instead of collapsing into a single `Int.MAX_VALUE` bucket sorted by display name.
+ */
+private fun QuestCategory.rankOf(questId: String, position: Int): Pair<Int, Int> {
+    val explicit = questOrders[questId]
+    return if (explicit != null) 0 to explicit else 1 to position
+}
+
+/**
+ * Quest refs of this category tree in their stable display order.
+ *
+ * Resolved against the category that actually *owns* each quest: a quest declared in a sub-category
+ * has its order in that sub-category's [QuestCategory.questOrders], so ranking the flattened list
+ * against the parent alone left every nested quest unordered.
+ *
+ * The result depends on configuration only — never on the viewing player — so filtering it later
+ * (visibility, sort mode, tracking) can remove entries but can never reshuffle the survivors.
+ */
+fun QuestCategory.orderedQuestRefs(): List<Ref<QuestEntry>> {
+    val own = quests
+        .filter { it.id.isNotBlank() }
+        .mapIndexed { position, ref -> ref to rankOf(ref.id, position) }
+        .sortedWith(compareBy({ it.second.first }, { it.second.second }, { it.first.id }))
+        .map { it.first }
+    val nested = subCategories.sortedWith(CATEGORY_ORDER).flatMap { it.orderedQuestRefs() }
+    return (own + nested).distinctBy { it.id }
+}
+
+fun QuestCategory.allQuests(): List<QuestEntry> = orderedQuestRefs().mapNotNull { it.get() }
 
 enum class CategoryStatus {
     BLOCKED,

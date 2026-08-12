@@ -563,7 +563,11 @@ object QuestCodexInitializer : Initializable {
             ownDefaultViewId = menuConfig.defaultViewId,
         )
         val pool = inherited.pool
-        val rootLayoutId = inherited.mainLayoutId
+        // Promote the root to its `<id>_extended` variant when the inherited pool declares one.
+        // Carried by inheritance rather than by a literal id comparison: a chassis whose root is
+        // named anything other than `shell_root` would otherwise lose its extended chrome, and
+        // every control anchored in the bottom band would vanish at render — hence unclickable.
+        val rootLayoutId = btcrenaud.gui.api.MenuViewSupport.extendedRootLayoutId(inherited, inherited.mainLayoutId)
 
         val baseLayoutCleaned: MenuLayout = if (rootLayoutId != null && pool.containsKey(rootLayoutId)) {
             LayoutParser.parse(player, ctx, menuConfig.guiType, size.slots, pool, pool[rootLayoutId]!!)
@@ -700,7 +704,10 @@ object QuestCodexInitializer : Initializable {
             activeViewId = resolvedView?.activeViewId,
             breadcrumb = resolvedView?.breadcrumb ?: emptyList(),
             viewSwitcher = if (inherited.views.isEmpty()) null else reopenOnView,
-        )
+        ).also {
+            it.extendToPlayerInventory = menuConfig.guiType == btcrenaud.gui.GuiType.CUSTOM &&
+                btcrenaud.gui.api.MenuViewSupport.isExtendedRoot(rootLayoutId)
+        }
 
         MenuSessionService.register(player, definition, pushHistory = pushHistory)
     }

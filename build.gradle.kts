@@ -1,12 +1,10 @@
-plugins {
+﻿plugins {
     kotlin("jvm") version "2.3.20"
     id("com.typewritermc.module-plugin") version "2.1.0"
 }
 
 group = "btcrenaud"
-version = "2.8"
-
-val omniGuiVersion = "0.11"
+version = "2.9"
 
 base {
     archivesName.set("Typewriter-QuestCodexExtension-Public")
@@ -17,16 +15,6 @@ repositories {
     maven("https://repo.bluecolored.de/releases")
     maven("https://maven.typewritermc.com/beta/")
     maven("https://maven.typewritermc.com/external")
-    ivy {
-        name = "omniGuiGitHubReleases"
-        url = uri("https://github.com/RenaudRl/Typewriter-OmniGUIExtension/releases/download")
-        patternLayout {
-            artifact("[revision]/Typewriter-OmniGUIExtension-$omniGuiVersion.[ext]")
-        }
-        metadataSources {
-            artifact()
-        }
-    }
 }
 
 dependencies {
@@ -34,7 +22,10 @@ dependencies {
     testImplementation("com.google.code.gson:gson:2.13.1")
     compileOnly("de.bluecolored:bluemap-api:2.7.3")
     compileOnly("com.flowpowered:flow-math:1.0.3")
-    compileOnly("btcrenaud:Typewriter-OmniGUIExtension:v$omniGuiVersion@jar")
+    // Built against the OmniGUI sources in this build, not a pinned release jar: the previous
+    // ivy pin froze this extension on v0.11 of the GUI engine, so every engine addition after
+    // that release was invisible here and had to be re-implemented locally.
+    compileOnly(project(":Typewriter-OmniGUIExtension"))
     compileOnly("com.typewritermc:QuestExtension:0.9.0")
 }
 

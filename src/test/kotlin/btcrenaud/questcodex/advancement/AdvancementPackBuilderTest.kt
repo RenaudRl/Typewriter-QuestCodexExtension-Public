@@ -174,6 +174,37 @@ class AdvancementPackBuilderTest {
     }
 
     @Test
+    fun `an unformatted title arrives as a bare JSON string and is written as one`() {
+        // What an author who typed a title with no colour tag produces. Refusing this shape cost
+        // every plain title its advancement, and the message blamed the text rather than the check.
+        val pack = AdvancementPackBuilder.build(listOf(spec("a", "root", title = "\"Adventures\"")))
+
+        assertTrue(pack.rejections.isEmpty())
+        assertEquals(
+            "Adventures",
+            advancement(pack, "questcodex", "root").getAsJsonObject("display").get("title").asString,
+        )
+    }
+
+    @Test
+    fun `a blank title is rejected, and says so rather than blaming the conversion`() {
+        val pack = AdvancementPackBuilder.build(listOf(spec("a", "root", title = "\"\"")))
+
+        assertEquals("a", pack.rejections.single().entryId)
+        assertTrue(pack.rejections.single().reason.contains("empty"))
+    }
+
+    @Test
+    fun `a blank description is a choice, not a mistake, and keeps its advancement`() {
+        val pack = AdvancementPackBuilder.build(
+            listOf(spec("a", "root").copy(descriptionJson = "\"\"")),
+        )
+
+        assertTrue(pack.rejections.isEmpty())
+        assertTrue(pack.files.containsKey("data/questcodex/advancement/root.json"))
+    }
+
+    @Test
     fun `the pack declares an open ended format range instead of a single version`() {
         val pack = AdvancementPackBuilder.build(emptyList())
 

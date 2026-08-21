@@ -25,6 +25,16 @@ object AdvancementDatapackService {
     private val mm = MiniMessage.miniMessage()
     private val componentJson = GsonComponentSerializer.gson()
 
+    /**
+     * Turns an author's MiniMessage text into the serialized component the pack carries.
+     *
+     * Internal rather than private because this is the one step of the conversion that the pack
+     * builder cannot see: it receives the result and can only judge its shape. Text with no
+     * formatting comes out of here as a bare JSON string rather than an object, and a builder that
+     * expected an object refused every unformatted title — so the two sides are tested together.
+     */
+    internal fun toComponentJson(text: String): String = componentJson.serialize(mm.deserialize(text))
+
     fun initialize() {
         val levelRoot = resolveLevelRoot() ?: return
 
@@ -133,8 +143,8 @@ object AdvancementDatapackService {
             key = entry.key.trim(),
             parentEntryId = entry.parent.id,
             icon = entry.icon.key.asString(),
-            titleJson = componentJson.serialize(mm.deserialize(entry.title)),
-            descriptionJson = componentJson.serialize(mm.deserialize(entry.description)),
+            titleJson = toComponentJson(entry.title),
+            descriptionJson = toComponentJson(entry.description),
             frame = entry.frame.jsonValue,
             background = entry.background.trim(),
             showToast = entry.showToast,

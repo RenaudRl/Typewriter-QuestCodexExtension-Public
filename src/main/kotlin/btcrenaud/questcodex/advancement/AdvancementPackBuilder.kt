@@ -112,8 +112,12 @@ object AdvancementPackBuilder {
             "namespace '${spec.namespace}' is invalid: only a-z, 0-9, '_', '.' and '-' are allowed."
         !KEY_PATTERN.matches(spec.key) ->
             "key '${spec.key}' is invalid: only a-z, 0-9, '_', '.', '-' and '/' are allowed."
-        !parses(spec.titleJson) -> "the title could not be converted to a text component."
-        !parses(spec.descriptionJson) -> "the description could not be converted to a text component."
+        isEmptyComponent(spec.titleJson) ->
+            "the title is empty, and an advancement is named by its title in the tree and on its toast."
+        !parsesAsComponent(spec.titleJson) ->
+            "the title could not be converted to a text component."
+        !parsesAsComponent(spec.descriptionJson) ->
+            "the description could not be converted to a text component."
         else -> null
     }
 
@@ -127,10 +131,27 @@ object AdvancementPackBuilder {
         return "'${spec.namespace}:${spec.key}' is already used by '$ownerName'."
     }
 
-    private fun parses(json: String): Boolean =
-        runCatching { JsonParser.parseString(json) }
-            .getOrNull()
-            ?.isJsonObject == true
+    /**
+     * Whether the serialized text the entry produced is one the client will read.
+     *
+     * An object is not the only shape that arrives here. A component carrying no style and no
+     * children — which is what an unformatted title is — is written by Adventure as a bare JSON
+     * string: `"Adventures"`, not `{"text":"Adventures"}`. Since 1.20.3 a string, an array and an
+     * object are all read as a text component wherever one is expected, so all three are accepted;
+     * anything else would be written here and refused at load time, which reports nothing.
+     */
+    private fun parsesAsComponent(json: String): Boolean {
+        val parsed = runCatching { JsonParser.parseString(json) }.getOrNull() ?: return false
+        return parsed.isJsonObject ||
+            parsed.isJsonArray ||
+            (parsed.isJsonPrimitive && parsed.asJsonPrimitive.isString)
+    }
+
+    /** An author who left the field blank, told apart from one whose text failed to convert. */
+    private fun isEmptyComponent(json: String): Boolean {
+        val parsed = runCatching { JsonParser.parseString(json) }.getOrNull() ?: return false
+        return parsed.isJsonPrimitive && parsed.asJsonPrimitive.isString && parsed.asString.isEmpty()
+    }
 
     /**
      * Removes every advancement that cannot reach a root, in one pass per removal.

@@ -5,6 +5,8 @@ import btcrenaud.gui.GuiType
 import btcrenaud.gui.InventorySize
 import btcrenaud.gui.LayoutData
 import btcrenaud.gui.SimpleLayoutData
+import btcrenaud.gui.FlexLayoutData
+import btcrenaud.gui.PaginatedLayoutData
 import btcrenaud.gui.GuiItemData
 import btcrenaud.gui.GuiSlotBuilder
 import btcrenaud.gui.api.LayoutParser
@@ -30,6 +32,9 @@ import btcrenaud.questcodex.ui.CodexButtonResolverLayout
 import btcrenaud.questcodex.ui.CodexButtonType
 import btcrenaud.questcodex.ui.DynamicSlotContent
 import btcrenaud.questcodex.advancement.AdvancementDatapackService
+import btcrenaud.questcodex.migration.CategoryMenuChassisMigration
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import btcrenaud.questcodex.tracking.QuestCodexTrackingService
 import btcrenaud.questcodex.recovery.QuestCodexRecoveryService
 import com.typewritermc.core.entries.Query
@@ -121,6 +126,15 @@ object QuestCodexInitializer : Initializable {
             // Not running on BTC Engine
         }
 
+        // ── Step 0: One-shot conversion of pages authored before the open_gui chassis ──
+        // Converted installations carry a marker, so this costs a single file check and nothing else.
+        val typewriterPlugin = Bukkit.getPluginManager().getPlugin("Typewriter")
+        if (typewriterPlugin != null) {
+            withContext(Dispatchers.IO) {
+                CategoryMenuChassisMigration.migrateOnce(typewriterPlugin.dataFolder, plugin.logger)
+            }
+        }
+
         // ── Step 1: Load global config ──
         loadGlobalConfig()
         val trackingArtifact = QuestCodexConfig.trackingArtifact.get()
@@ -166,13 +180,16 @@ object QuestCodexInitializer : Initializable {
             assignQuests(entry)
         }
 
-        // ── Step 6: Register GUI command handlers ──
+        // ── Step 6: Report menus that cannot draw, while the console is still being read ──
+        validateMenuConfigs()
+
+        // ── Step 7: Register GUI command handlers ──
         registerCommandHandlers()
 
-        // ── Step 7: Initialize BlueMap integration ──
+        // ── Step 8: Initialize BlueMap integration ──
         BlueMapIntegrationService.initialize()
 
-        // ── Step 8: Write the advancement datapack ──
+        // ── Step 9: Write the advancement datapack ──
         AdvancementDatapackService.initialize()
 
         plugin.logger.info("[QuestCodex] Initialized: ${QuestCategoryRegistry.all().size} categories, ${categoryMenuEntries.size} menu configs")
@@ -401,6 +418,113 @@ object QuestCodexInitializer : Initializable {
         }
     }
 
+    // ── Startup validation ──
+
+    /**
+     * Reports, at startup, every menu that cannot draw — instead of at click time, silently.
+     *
+     * A `category_menu` without a resolvable chassis makes [openCategoryMenu] return with nothing
+     * shown to the player: the inventory simply never opens, which reads as "the extension is
+     * broken". The layout pool moved out of `category_menu` and into a referenced `open_gui`
+     * entry, so any page written against the older schema keeps a layout the engine no longer
+     * reads: the entry still *looks* fully configured in the panel while rendering nothing. Each
+     * message below therefore states the fix, not just the symptom.
+     */
+    private fun validateMenuConfigs() {
+        categoryMenuEntries.values.forEach { entry ->
+            val label = if (entry.category.isBlank()) "main menu" else "category '${entry.category}'"
+            problemsOf(entry).forEach { problem ->
+                plugin.logger.warning("[QuestCodex] $label (entry '${entry.name}'): $problem")
+            }
+        }
+
+        // The mirror case: a category exists and is clickable, but nothing is configured to open.
+        QuestCategoryRegistry.all()
+            .filter { categoryMenuEntries[it.name.lowercase()] == null }
+            .forEach {
+                plugin.logger.warning(
+                    "[QuestCodex] category '${it.name}' is defined but has no category_menu entry; " +
+                        "opening it does nothing. Create a category_menu with category '${it.name}'."
+                )
+            }
+    }
+
+    /** Every reason [entry] would fail to render, ordered the way an author should fix them. */
+    private fun problemsOf(entry: CategoryMenuEntry): List<String> {
+        val problems = mutableListOf<String>()
+
+        if (entry.category.isNotBlank() &&
+            !entry.category.equals("@tracked", ignoreCase = true) &&
+            QuestCategoryRegistry.find(entry.category) == null
+        ) {
+            problems += "no quest category named '${entry.category}' is defined. " +
+                "Add a quest_category entry with that exact name, or this menu can never open."
+        }
+
+        if (entry.menu.id.isBlank()) {
+            problems += "no GUI entry is selected in `menu`, so this menu has no layout at all and " +
+                "opening it does nothing. The layout pool now lives in an open_gui entry: create " +
+                "one, build the layout there, and reference it from `menu`. A layout stored on the " +
+                "category_menu itself is legacy data and is never read."
+            return problems
+        }
+
+        val gui = entry.menu.get()
+        if (gui == null) {
+            problems += "`menu` points at '${entry.menu.id}', which is not a loadable open_gui entry."
+            return problems
+        }
+
+        if (gui.layoutPool.isEmpty()) {
+            problems += "the referenced GUI '${gui.name}' has an empty layout pool."
+        }
+
+        val mainLayoutId = gui.mainLayoutId
+        if (mainLayoutId.isNullOrBlank()) {
+            problems += "the referenced GUI '${gui.name}' has no main layout selected."
+        } else if (gui.baseMenuId.isBlank() && gui.layoutPool.none { it.id == mainLayoutId }) {
+            problems += "the main layout '$mainLayoutId' of GUI '${gui.name}' is not in its layout pool."
+        }
+
+        val markerType = markerTypeFor(entry)
+        if (gui.layoutPool.flatMap(::layoutItems).none { it.buttonType == markerType }) {
+            val what = if (markerType == CodexButtonType.CATEGORY_SLOT.name) "category" else "quest"
+            problems += "no slot in GUI '${gui.name}' is tagged '$markerType', so the menu opens " +
+                "with no $what in it. Tag at least one slot with it — one tagged slot holds one $what."
+        }
+
+        // The codex builds the inventory from `rows`, not from the GUI's own size: a mismatch
+        // silently drops every slot the author placed on the rows beyond it.
+        val guiRows = gui.size?.slots?.div(9)
+        val rows = entry.rows.coerceIn(1, 6)
+        if (guiRows != null && guiRows != rows) {
+            problems += "this menu is built with $rows rows (the category_menu `rows` field) while " +
+                "GUI '${gui.name}' is sized for $guiRows. Slots below row $rows are dropped. " +
+                "Set both to the same value."
+        }
+
+        return problems
+    }
+
+    /** The dynamic marker this menu's slots must carry. */
+    private fun markerTypeFor(entry: CategoryMenuEntry): String = when {
+        entry.category.isBlank() -> CodexButtonType.CATEGORY_SLOT.name
+        entry.category.equals("@tracked", ignoreCase = true) -> CodexButtonType.TRACKED_QUEST_SLOT.name
+        else -> CodexButtonType.QUEST_SLOT.name
+    }
+
+    /** Items a pool layout declares directly; container layouts hold theirs by reference. */
+    private fun layoutItems(data: LayoutData): List<GuiItemData> = when (data) {
+        is SimpleLayoutData -> data.items
+        is FlexLayoutData -> data.items
+        is PaginatedLayoutData -> data.items
+        else -> emptyList()
+    }
+
+    /** Single line describing why a menu will not open, for the click-time warnings. */
+    private fun chassisFailure(entry: CategoryMenuEntry): String =
+        problemsOf(entry).firstOrNull() ?: "its layout pool is empty."
+
     // ── Category registration ──
 
     private fun registerCategory(entry: QuestCategoryDefinitionEntry) {
@@ -528,11 +652,9 @@ object QuestCodexInitializer : Initializable {
         val size = InventorySize.entries.getOrNull(rows - 1) ?: InventorySize.SIZE_54
 
         // 1. Index dynamic markers so they traverse parsing as ordinary tagged slots.
-        val markerType = when {
-            isMainMenu -> CodexButtonType.CATEGORY_SLOT.name
-            menuConfig.category.equals("@tracked", ignoreCase = true) -> CodexButtonType.TRACKED_QUEST_SLOT.name
-            else -> CodexButtonType.QUEST_SLOT.name
-        }
+        // Shared with the startup validation on purpose: a second copy here is how the marker the
+        // author is told to place drifts away from the one the renderer actually looks for.
+        val markerType = markerTypeFor(menuConfig)
         val (indexedPool, markerCount) = indexDynamicMarkers(menuConfig.layoutPool.filterNotNull(), markerType)
 
         val menuId =
@@ -785,7 +907,12 @@ object QuestCodexInitializer : Initializable {
                 listOf(trigger).triggerEntriesFor(player, context())
                 return
             }
-            plugin.logger.warning("[QuestCodex] Main menu opened but no category_menu entry with layout pool found. Create a category_menu entry with empty category, or set mainMenuTrigger in the quest_codex config.")
+            val cause = menuConfig?.let { chassisFailure(it) }
+                ?: "no category_menu entry with an empty category exists."
+            plugin.logger.warning(
+                "[QuestCodex] Main menu could not open: $cause " +
+                    "Alternatively, set mainMenuTrigger in the quest_codex config."
+            )
             return
         }
 
@@ -834,7 +961,9 @@ object QuestCodexInitializer : Initializable {
         }
 
         if (menuConfig == null || !menuConfig.usesLayoutPool) {
-            plugin.logger.warning("[QuestCodex] Category '$categoryName' opened but no category_menu entry with layout pool found. Create a category_menu entry for this category with a layout pool.")
+            val cause = menuConfig?.let { chassisFailure(it) }
+                ?: "no category_menu entry exists for it. Create one with category '$categoryName'."
+            plugin.logger.warning("[QuestCodex] Category '$categoryName' could not open: $cause")
             return
         }
 
@@ -857,7 +986,9 @@ object QuestCodexInitializer : Initializable {
     fun openTrackedQuestsMenu(player: Player, pushHistory: Boolean = true) {
         val menuConfig = categoryMenuEntries["@tracked"]
         if (menuConfig == null || !menuConfig.usesLayoutPool) {
-            plugin.logger.warning("[QuestCodex] No category_menu with category '@tracked' is configured.")
+            val cause = menuConfig?.let { chassisFailure(it) }
+                ?: "no category_menu with category '@tracked' is configured."
+            plugin.logger.warning("[QuestCodex] Tracked-quests menu could not open: $cause")
             return
         }
         val quests = QuestCodexTrackingService.trackedQuestIds(player)

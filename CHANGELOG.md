@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.11 - 2026-08-29
+
+- Rebuilt against OmniGUI (GuiAndDialogs) v0.14.
+
 ## 2.9 — 2026-08-12
 
 - The extended-chassis promotion is carried by inheritance rather than by a literal layout id.

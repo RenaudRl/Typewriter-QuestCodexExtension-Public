@@ -1,10 +1,10 @@
-﻿plugins {
+plugins {
     kotlin("jvm") version "2.3.20"
     id("com.typewritermc.module-plugin") version "2.1.0"
 }
 
 group = "btcrenaud"
-version = "2.10"
+version = "2.11"
 
 base {
     archivesName.set("Typewriter-QuestCodexExtension-Public")

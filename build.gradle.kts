@@ -1,10 +1,10 @@
 plugins {
-    kotlin("jvm") version "2.3.20"
-    id("com.typewritermc.module-plugin") version "2.1.0"
+    kotlin("jvm") version "2.2.10"
+    id("com.typewritermc.module-plugin") version "2.2.0"
 }
 
 group = "btcrenaud"
-version = "2.11"
+version = "2.12"
 
 base {
     archivesName.set("Typewriter-QuestCodexExtension-Public")
@@ -42,7 +42,7 @@ typewriter {
         name = "QuestCodex"
         shortDescription = "Create a Quest Codex in TypeWriter"
         description = """Typewriter extension module providing additional entries for the Typewriter plugin ecosystem. Supports Paper and Folia server platforms with full feature parity. This module extends the core functionality with specialized entries. Compatible with the official Typewriter engine and designed for standalone use."""
-        engineVersion = "0.9.0-beta-175"
+        engineVersion = "0.9.0-beta-176"
         channel = com.typewritermc.moduleplugin.ReleaseChannel.BETA
 
         dependencies {

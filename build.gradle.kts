@@ -1,10 +1,12 @@
 plugins {
-    kotlin("jvm") version "2.3.20"
-    id("com.typewritermc.module-plugin") version "2.1.0"
+    kotlin("jvm") version "2.2.10"
+    id("com.typewritermc.module-plugin") version "2.2.0"
 }
 
 group = "btcrenaud"
-version = "2.11"
+version = "2.12"
+
+val omniGuiVersion = "0.15"
 
 base {
     archivesName.set("Typewriter-QuestCodexExtension-Public")
@@ -15,6 +17,16 @@ repositories {
     maven("https://repo.bluecolored.de/releases")
     maven("https://maven.typewritermc.com/beta/")
     maven("https://maven.typewritermc.com/external")
+    ivy {
+        name = "omniGuiGitHubReleases"
+        url = uri("https://github.com/RenaudRl/Typewriter-OmniGUIExtension/releases/download")
+        patternLayout {
+            artifact("[revision]/Typewriter-OmniGUIExtension-$omniGuiVersion.[ext]")
+        }
+        metadataSources {
+            artifact()
+        }
+    }
 }
 
 dependencies {
@@ -28,10 +40,7 @@ dependencies {
     testImplementation("net.kyori:adventure-text-serializer-gson:5.1.1")
     compileOnly("de.bluecolored:bluemap-api:2.7.3")
     compileOnly("com.flowpowered:flow-math:1.0.3")
-    // Built against the OmniGUI sources in this build, not a pinned release jar: the previous
-    // ivy pin froze this extension on v0.11 of the GUI engine, so every engine addition after
-    // that release was invisible here and had to be re-implemented locally.
-    compileOnly(project(":Typewriter-OmniGUIExtension"))
+    compileOnly("btcrenaud:Typewriter-OmniGUIExtension:v$omniGuiVersion@jar")
     compileOnly("com.typewritermc:QuestExtension:0.9.0")
 }
 
@@ -42,7 +51,7 @@ typewriter {
         name = "QuestCodex"
         shortDescription = "Create a Quest Codex in TypeWriter"
         description = """Typewriter extension module providing additional entries for the Typewriter plugin ecosystem. Supports Paper and Folia server platforms with full feature parity. This module extends the core functionality with specialized entries. Compatible with the official Typewriter engine and designed for standalone use."""
-        engineVersion = "0.9.0-beta-175"
+        engineVersion = "0.9.0-beta-176"
         channel = com.typewritermc.moduleplugin.ReleaseChannel.BETA
 
         dependencies {

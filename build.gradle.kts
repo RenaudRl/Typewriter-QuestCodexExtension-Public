@@ -15,6 +15,16 @@ repositories {
     maven("https://repo.bluecolored.de/releases")
     maven("https://maven.typewritermc.com/beta/")
     maven("https://maven.typewritermc.com/external")
+    ivy {
+        name = "omniGuiGitHubReleases"
+        url = uri("https://github.com/RenaudRl/Typewriter-OmniGUIExtension/releases/download")
+        patternLayout {
+            artifact("[revision]/Typewriter-OmniGUIExtension-$omniGuiVersion.[ext]")
+        }
+        metadataSources {
+            artifact()
+        }
+    }
 }
 
 dependencies {
@@ -28,10 +38,7 @@ dependencies {
     testImplementation("net.kyori:adventure-text-serializer-gson:5.1.1")
     compileOnly("de.bluecolored:bluemap-api:2.7.3")
     compileOnly("com.flowpowered:flow-math:1.0.3")
-    // Built against the OmniGUI sources in this build, not a pinned release jar: the previous
-    // ivy pin froze this extension on v0.11 of the GUI engine, so every engine addition after
-    // that release was invisible here and had to be re-implemented locally.
-    compileOnly(project(":Typewriter-OmniGUIExtension"))
+    compileOnly("btcrenaud:Typewriter-OmniGUIExtension:v$omniGuiVersion@jar")
     compileOnly("com.typewritermc:QuestExtension:0.9.0")
 }
 

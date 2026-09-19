@@ -854,6 +854,11 @@ object QuestCodexInitializer : Initializable {
                         y = py,
                         direction = null,
                         count = 1,
+                        // `gap` is neutralised along with `count` and `repeatY`: an indexed
+                        // marker occupies ONE cell. Left at its original value it described a
+                        // repetition nothing plays any more, which validation then reported as
+                        // an orphan repetition.
+                        gap = 1,
                         repeatY = 1,
                     )
                 }

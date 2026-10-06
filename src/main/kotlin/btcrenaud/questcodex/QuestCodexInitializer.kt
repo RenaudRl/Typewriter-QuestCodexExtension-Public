@@ -114,6 +114,7 @@ object QuestCodexInitializer : Initializable {
 
     override suspend fun initialize() {
         val manager = Bukkit.getPluginManager()
+        QuestCodexPermissions.register(manager)
 
         // BTC Engine Native Support
         try {

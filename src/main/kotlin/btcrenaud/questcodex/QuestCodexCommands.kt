@@ -45,7 +45,7 @@ class CodexCategoryArgumentType : CustomArgumentType.Converted<String, String> {
  */
 @TypewriterCommand
 fun CommandTree.questCodexCommands() = literal("codex") {
-    withPermission("typewriter.codex.open")
+    withPermission(QuestCodexPermissions.OPEN)
 
     // /tw codex → opens the main codex menu
     executePlayer { player ->

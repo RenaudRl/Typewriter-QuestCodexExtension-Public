@@ -40,6 +40,9 @@ dependencies {
     // the point of the test is to see the serialization the server actually performs.
     testImplementation("net.kyori:adventure-text-minimessage:5.1.1")
     testImplementation("net.kyori:adventure-text-serializer-gson:5.1.1")
+    // The permission test builds real Bukkit Permission objects; the runtime classpath of the tests
+    // does not receive paper-api from the engine, so it is named here (same version as compilation).
+    testImplementation("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
     compileOnly("de.bluecolored:bluemap-api:2.7.3")
     compileOnly("com.flowpowered:flow-math:1.0.3")
     compileOnly("btcrenaud:Typewriter-OmniGUIExtension:v$omniGuiVersion@jar")

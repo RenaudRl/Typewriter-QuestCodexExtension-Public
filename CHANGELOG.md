@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **`typewriter.codex.open` is now declared by the extension**, with an operator-only default
+  (`PermissionDefault.OP`), as the documentation states. Behaviour is unchanged for servers that
+  already grant it through a permissions plugin; the node now shows up in permission plugins
+  (tab completion, listing) and a node already declared elsewhere is left untouched.
+
 ## 2.14 — 2026-09-19
 
 - **Documented a breaking change made in 0.3.0 (2026-07-16) that was never announced.** Until

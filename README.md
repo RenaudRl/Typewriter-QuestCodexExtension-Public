@@ -2,7 +2,8 @@
 
 ![Java Version](https://img.shields.io/badge/Java-21-orange)
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
-![Target](https://img.shields.io/badge/Target-Paper%20/%20Folia%20/%20BTC--CORE-blue)
+![Target](https://img.shields.io/badge/Target-Paper-blue)
+![Typewriter](https://img.shields.io/badge/Typewriter-0.9.0--beta--177-purple)
 
 **QuestCodex Extension** is a quest management interface for **TypeWriter**, engineered for **BTC Studio** infrastructure. It provides players with a comprehensive codex to view and track their quest progress.
 
@@ -23,6 +24,39 @@
 ## ⚙️ Configuration
 
 QuestCodex Extension configuration is managed via TypeWriter's manifest system.
+
+**Requirements**: Typewriter `0.9.0-beta-177` on Paper, the Quest extension (`typewritermc:Quest`) and the
+GUI extension (`renaud:GuiAndDialogs`, [OmniGUI](https://github.com/RenaudRl/Typewriter-OmniGUIExtension)).
+BlueMap is only needed for the `bluemap_icon` entry.
+
+### 📚 Entries
+
+| Entry | Id |
+|---|---|
+| Quest Codex Global Settings | `quest_codex` |
+| Category Menu Configuration | `category_menu` |
+| Quest Category | `quest_category` |
+| Quest Assignment to Category | `quest_assignment` |
+| Quest Additional Lore | `quest_lore` |
+| Advancement Definition | `advancement_definition` |
+| Grant Advancement (action) | `grant_advancement` |
+| Quest Codex Waypoint | `quest_codex_waypoint` |
+| Quest Codex Locator Bar | `quest_codex_locator_bar` |
+| BlueMap Icon | `bluemap_icon` |
+| Tracking artifact | `quest_codex_tracking_artifact` |
+| Recovery artifact | `quest_codex_recovery_artifact` |
+
+### Commands & permissions
+
+| Command | Permission | Description |
+|---|---|---|
+| `/tw codex` | `typewriter.codex.open` | Open the main codex menu. |
+| `/tw codex tracked` | `typewriter.codex.open` | Open the tracked quests menu. |
+| `/tw codex <category>` | `typewriter.codex.open` | Open one category. |
+
+The extension declares `typewriter.codex.open` itself, with an operator-only default, so it shows up in
+permissions plugins such as LuckPerms. Grant it to the groups that may browse the codex. Opening a menu
+from an action or a button needs no permission.
 
 ## 🛠 Building & Deployment
 

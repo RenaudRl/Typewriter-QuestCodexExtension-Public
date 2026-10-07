@@ -72,6 +72,20 @@ class QuestCodexConfigEntry(
     val trackingLimitMessage: String = "<red>You can track at most {max} quests.</red>",
     @Help("Entry triggered to open the main menu (e.g. an open_gui entry) when no category_menu with an empty category exists. Used by /tw codex and the BACK button.")
     val mainMenuTrigger: Ref<TriggerableEntry> = emptyRef(),
+
+    @Help("Labels of the built-in navigation buttons (next, previous, scroll, back, close, sort), shown when their slot has no configured item.")
+    val navLabels: CodexNavLabels = CodexNavLabels(),
+    @Help("Texts of the sort button, used when the category menu does not set its own for the active sort mode.")
+    val sortTexts: CodexSortTexts = CodexSortTexts(),
+    @Help("Title of the main menu when its category_menu entry has no title.")
+    @Placeholder @Colored
+    val mainMenuTitle: String = "<dark_gray>Quest Codex",
+    @Help("Title of the tracked quests menu when its category_menu entry has no title.")
+    @Placeholder @Colored
+    val trackedQuestsTitle: String = "<gold>Tracked quests",
+    @Help("Error shown when a player runs /tw codex with a category that does not exist. Supports MiniMessage. Placeholders: {category}")
+    @Colored
+    val unknownCategoryMessage: String = "Unknown category: {category}",
 ) : ManifestEntry
 
 object QuestCodexConfig {
@@ -122,6 +136,16 @@ object QuestCodexConfig {
         private set
     var mainMenuTrigger: Ref<TriggerableEntry> = emptyRef()
         private set
+    var navLabels: CodexNavLabels = CodexNavLabels()
+        private set
+    var sortTexts: CodexSortTexts = CodexSortTexts()
+        private set
+    var mainMenuTitle: String = DEFAULT_MAIN_MENU_TITLE
+        private set
+    var trackedQuestsTitle: String = DEFAULT_TRACKED_QUESTS_TITLE
+        private set
+    var unknownCategoryMessage: String = DEFAULT_UNKNOWN_CATEGORY_MESSAGE
+        private set
 
     fun reset() {
         soundOnOpen = defaultSound("minecraft:item.book.page_turn")
@@ -147,6 +171,11 @@ object QuestCodexConfig {
         questUntrackHint = "<yellow>Click to stop tracking</yellow>"
         trackingLimitMessage = "<red>You can track at most {max} quests.</red>"
         mainMenuTrigger = emptyRef()
+        navLabels = CodexNavLabels()
+        sortTexts = CodexSortTexts()
+        mainMenuTitle = DEFAULT_MAIN_MENU_TITLE
+        trackedQuestsTitle = DEFAULT_TRACKED_QUESTS_TITLE
+        unknownCategoryMessage = DEFAULT_UNKNOWN_CATEGORY_MESSAGE
     }
 
     fun apply(entry: QuestCodexConfigEntry) {
@@ -173,7 +202,17 @@ object QuestCodexConfig {
         questUntrackHint = entry.questUntrackHint
         trackingLimitMessage = entry.trackingLimitMessage
         mainMenuTrigger = entry.mainMenuTrigger
+        navLabels = entry.navLabels
+        sortTexts = entry.sortTexts
+        mainMenuTitle = entry.mainMenuTitle
+        trackedQuestsTitle = entry.trackedQuestsTitle
+        unknownCategoryMessage = entry.unknownCategoryMessage
     }
 }
 
 private fun defaultSound(id: String): Sound = Sound(DefaultSoundId(id))
+
+// Same values as the field defaults of QuestCodexConfigEntry, which stay literals so the docs generator can read them.
+private const val DEFAULT_MAIN_MENU_TITLE = "<dark_gray>Quest Codex"
+private const val DEFAULT_TRACKED_QUESTS_TITLE = "<gold>Tracked quests"
+private const val DEFAULT_UNKNOWN_CATEGORY_MESSAGE = "Unknown category: {category}"

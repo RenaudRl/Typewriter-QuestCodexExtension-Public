@@ -749,14 +749,9 @@ object QuestCodexInitializer : Initializable {
                 CodexNavDefaults.defaultItem(CodexNavAction.SORT).build(player)
             }
             val sortLabel = display?.label?.takeIf { it.isNotBlank() }
-                ?: when (sortModeOf(player)) {
-                    SortMode.ALL -> "<yellow>📋 All quests"
-                    SortMode.NOT_STARTED -> "<white>📋 Not started"
-                    SortMode.ACTIVE -> "<green>📋 In progress"
-                    SortMode.COMPLETED -> "<gray>📋 Completed"
-                }
+                ?: QuestCodexConfig.sortTexts.labelFor(sortModeConfig).parsePlaceholders(player)
             val sortLore = display?.lore?.takeIf { it.isNotEmpty() }
-                ?: listOf("<gray>Click to change sorting")
+                ?: listOf(QuestCodexConfig.sortTexts.hint.parsePlaceholders(player))
             val sortMeta = sortItem.itemMeta
             sortMeta.displayName(
                 mm.deserialize(sortLabel)
@@ -782,7 +777,7 @@ object QuestCodexInitializer : Initializable {
         )
 
         val fallbackTitle = if (isMainMenu) {
-            menuConfig.title.ifBlank { "<dark_gray>Quest Codex" }
+            menuConfig.title.ifBlank { QuestCodexConfig.mainMenuTitle }
         } else {
             menuConfig.title.ifBlank { QuestCategoryRegistry.find(menuConfig.category)?.title ?: menuConfig.category }
         }
@@ -1001,7 +996,7 @@ object QuestCodexInitializer : Initializable {
             .mapNotNull { Query.findById<QuestEntry>(it) }
         val syntheticCategory = QuestCategoryRegistry.register(
             name = "@tracked",
-            title = menuConfig.title.ifBlank { "<gold>Tracked quests" },
+            title = menuConfig.title.ifBlank { QuestCodexConfig.trackedQuestsTitle },
             rows = menuConfig.rows,
         )
         syntheticCategory.quests.clear()

@@ -1,5 +1,6 @@
 package btcrenaud.questcodex.navigation
 
+import btcrenaud.questcodex.entries.QuestCodexConfig
 import com.typewritermc.engine.paper.utils.item.CustomItem
 import com.typewritermc.engine.paper.utils.item.Item
 import com.typewritermc.engine.paper.utils.item.components.ItemMaterialComponent
@@ -22,18 +23,6 @@ object CodexNavDefaults {
         CodexNavAction.SORT to CustomItem(listOf(ItemMaterialComponent(ConstVar(Material.HOPPER)))),
     )
 
-    val label: Map<CodexNavAction, String> = mapOf(
-        CodexNavAction.PAGE_NEXT to "<yellow>Next",
-        CodexNavAction.PAGE_PREV to "<yellow>Previous",
-        CodexNavAction.SCROLL_UP to "<white>Up",
-        CodexNavAction.SCROLL_DOWN to "<white>Down",
-        CodexNavAction.SCROLL_LEFT to "<white>Left",
-        CodexNavAction.SCROLL_RIGHT to "<white>Right",
-        CodexNavAction.BACK to "<red>Back",
-        CodexNavAction.CLOSE to "<red>Close",
-        CodexNavAction.SORT to "<yellow>Sort",
-    )
-
     val sound: Map<CodexNavAction, Sound> = mapOf(
         CodexNavAction.PAGE_NEXT to defaultSound("minecraft:item.flintandsteel.use"),
         CodexNavAction.PAGE_PREV to defaultSound("minecraft:item.flintandsteel.use"),
@@ -47,7 +36,10 @@ object CodexNavDefaults {
     )
 
     fun defaultItem(action: CodexNavAction): Item = item[action] ?: CustomItem()
-    fun defaultLabel(action: CodexNavAction): String = label[action] ?: action.name
+
+    /** Label of the built-in button for [action]: the `navLabels` of the `quest_codex` entry. */
+    fun defaultLabel(action: CodexNavAction): String = QuestCodexConfig.navLabels.labelFor(action)
+
     fun defaultSound(action: CodexNavAction): Sound? = sound[action]
 }
 

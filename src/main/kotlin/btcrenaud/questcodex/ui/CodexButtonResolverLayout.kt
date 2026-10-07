@@ -7,6 +7,7 @@ import btcrenaud.gui.api.Viewport
 import btcrenaud.gui.services.MenuSessionService
 import btcrenaud.questcodex.navigation.CodexNavAction
 import btcrenaud.questcodex.navigation.CodexNavDefaults
+import com.typewritermc.engine.paper.extensions.placeholderapi.parsePlaceholders
 import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Material
@@ -131,7 +132,7 @@ class CodexButtonResolverLayout(
             val fallback = CodexNavDefaults.defaultItem(action).build(p)
             val meta = fallback.itemMeta
             meta.displayName(
-                mm.deserialize(CodexNavDefaults.defaultLabel(action))
+                mm.deserialize(CodexNavDefaults.defaultLabel(action).parsePlaceholders(p))
                     .decoration(TextDecoration.ITALIC, false)
             )
             fallback.itemMeta = meta

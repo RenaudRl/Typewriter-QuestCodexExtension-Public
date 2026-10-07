@@ -1,15 +1,18 @@
 package btcrenaud.questcodex
 
-import com.mojang.brigadier.LiteralMessage
+import btcrenaud.questcodex.entries.QuestCodexConfig
 import com.mojang.brigadier.arguments.ArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.context.CommandContext
+import com.mojang.brigadier.exceptions.CommandSyntaxException
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType
 import com.mojang.brigadier.suggestion.Suggestions
 import com.mojang.brigadier.suggestion.SuggestionsBuilder
 import com.typewritermc.core.extension.annotations.TypewriterCommand
 import com.typewritermc.engine.paper.command.dsl.*
+import io.papermc.paper.command.brigadier.MessageComponentSerializer
 import io.papermc.paper.command.brigadier.argument.CustomArgumentType
+import net.kyori.adventure.text.minimessage.MiniMessage
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -17,14 +20,18 @@ import java.util.concurrent.CompletableFuture
  */
 class CodexCategoryArgumentType : CustomArgumentType.Converted<String, String> {
     override fun convert(nativeType: String): String {
-        val category = QuestCategoryRegistry.find(nativeType)
-            ?: throw SimpleCommandExceptionType(
-                LiteralMessage("Unknown category: $nativeType")
-            ).create()
+        QuestCategoryRegistry.find(nativeType) ?: throw unknownCategory(nativeType)
         return nativeType
     }
 
     override fun getNativeType(): ArgumentType<String> = StringArgumentType.word()
+
+    /** The error shown to the player: the `unknownCategoryMessage` of the `quest_codex` entry. */
+    private fun unknownCategory(name: String): CommandSyntaxException {
+        val miniMessage = MiniMessage.miniMessage()
+        val text = QuestCodexConfig.unknownCategoryMessage.replace("{category}", miniMessage.escapeTags(name))
+        return SimpleCommandExceptionType(MessageComponentSerializer.message().serialize(miniMessage.deserialize(text))).create()
+    }
 
     override fun <S : Any> listSuggestions(
         context: CommandContext<S>,

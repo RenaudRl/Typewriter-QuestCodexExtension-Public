@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.15 — 2026-10-08
 
 - **`typewriter.codex.open` is now declared by the extension**, with an operator-only default
   (`PermissionDefault.OP`), as the documentation states. Behaviour is unchanged for servers that

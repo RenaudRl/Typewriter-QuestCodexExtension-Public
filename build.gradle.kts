@@ -4,11 +4,11 @@ plugins {
 }
 
 group = "btcrenaud"
-version = "2.15"
+version = "2.16"
 
 // Resolved from the published OmniGUI release, not from a sibling project: this repository is
 // cloned on its own, so a project dependency would leave it unbuildable outside the workspace.
-val omniGuiVersion = "0.18"
+val omniGuiVersion = "0.20"
 
 base {
     archivesName.set("Typewriter-QuestCodexExtension-Public")

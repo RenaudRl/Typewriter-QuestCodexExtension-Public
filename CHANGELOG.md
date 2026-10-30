@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.17.1 — 2026-10-30
+
+- **Fixed: a Category Menu whose category is `@tracked` now opens the tracked-quests menu**, where
+  it used to fail with "Category '@tracked' not found".
+
 ## 2.15 — 2026-10-08
 
 - **`typewriter.codex.open` is now declared by the extension**, with an operator-only default

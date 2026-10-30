@@ -18,6 +18,7 @@ import btcrenaud.gui.api.CompositeLayout
 import btcrenaud.gui.api.ScrollableLayout
 import btcrenaud.gui.api.PaginatedLayout
 import btcrenaud.gui.api.EmptyLayout
+import btcrenaud.gui.api.GuiText
 import btcrenaud.gui.services.MenuSessionService
 import btcrenaud.questcodex.entries.CategoryMenuEntry
 import btcrenaud.questcodex.entries.QuestAssignmentEntry
@@ -30,6 +31,7 @@ import btcrenaud.questcodex.navigation.CodexNavDefaults
 import btcrenaud.questcodex.ui.AugmentedSimpleLayout
 import btcrenaud.questcodex.ui.CodexButtonResolverLayout
 import btcrenaud.questcodex.ui.CodexButtonType
+import btcrenaud.questcodex.ui.CodexButtonTypes
 import btcrenaud.questcodex.ui.DynamicSlotContent
 import btcrenaud.questcodex.advancement.AdvancementDatapackService
 import btcrenaud.questcodex.migration.CategoryMenuChassisMigration
@@ -113,8 +115,16 @@ object QuestCodexInitializer : Initializable {
     }
 
     override suspend fun initialize() {
+        // GuiText only exists from OmniGUI 0.21; the dependency DSL cannot state a version. Do not stop the init.
+        try {
+            Class.forName("btcrenaud.gui.api.GuiText")
+        } catch (_: ClassNotFoundException) {
+            plugin.logger.severe("[QuestCodex] requires OmniGUI 0.21 or newer: menus will not open until OmniGUI is updated.")
+        }
+
         val manager = Bukkit.getPluginManager()
         QuestCodexPermissions.register(manager)
+        CodexButtonTypes.register()
 
         // BTC Engine Native Support
         try {
@@ -396,6 +406,7 @@ object QuestCodexInitializer : Initializable {
     }
 
     override suspend fun shutdown() {
+        CodexButtonTypes.unregister()
         questPagination.clear()
         sortModes.clear()
         categoryMenuEntries.clear()
@@ -799,10 +810,11 @@ object QuestCodexInitializer : Initializable {
             )
 
         val resolvedLayout = resolvedView?.layout ?: decorate(baseLayoutCleaned)
-        val rawTitle = (resolvedView?.rawTitle ?: fallbackTitle).parsePlaceholders(player)
+        // The template, not its resolved text: OmniGUI resolves the placeholders for the viewer.
+        val rawTitle = resolvedView?.rawTitle ?: fallbackTitle
 
         val componentTitle = try {
-            mm.deserialize(rawTitle)
+            GuiText.parse(rawTitle, player)
         } catch (_: Exception) {
             mm.deserialize("<white>${rawTitle.replace("&", "§")}")
         }
@@ -845,7 +857,7 @@ object QuestCodexInitializer : Initializable {
                 else expandMarkerPositions(item).map { (px, py) ->
                     item.copy(
                         buttonType = "$markerType#${counter++}",
-                        buttonPrefix = "codex_button:",
+                        buttonPrefix = CodexButtonResolverLayout.PREFIX,
                         x = px,
                         y = py,
                         direction = null,

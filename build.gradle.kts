@@ -4,11 +4,15 @@ plugins {
 }
 
 group = "btcrenaud"
-version = "2.16"
+version = "2.17"
 
 // Resolved from the published OmniGUI release, not from a sibling project: this repository is
 // cloned on its own, so a project dependency would leave it unbuildable outside the workspace.
-val omniGuiVersion = "0.20"
+val omniGuiVersion = "0.21"
+
+// 0.21 is not on the GitHub releases yet: -PomniGuiJar=<path> compiles against a local build of it instead.
+val omniGui: Any = providers.gradleProperty("omniGuiJar").orNull?.let { files(it) }
+    ?: "btcrenaud:Typewriter-OmniGUIExtension:v$omniGuiVersion@jar"
 
 base {
     archivesName.set("Typewriter-QuestCodexExtension-Public")
@@ -45,7 +49,7 @@ dependencies {
     testImplementation("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
     compileOnly("de.bluecolored:bluemap-api:2.7.3")
     compileOnly("com.flowpowered:flow-math:1.0.3")
-    compileOnly("btcrenaud:Typewriter-OmniGUIExtension:v$omniGuiVersion@jar")
+    compileOnly(omniGui)
     compileOnly("com.typewritermc:QuestExtension:0.9.0")
 }
 

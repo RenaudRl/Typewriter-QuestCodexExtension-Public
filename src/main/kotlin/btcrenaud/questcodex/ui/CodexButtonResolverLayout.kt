@@ -41,11 +41,16 @@ class CodexButtonResolverLayout(
     override val id: String? = null,
 ) : MenuLayout {
 
+    companion object {
+        /** Tag prefix of every codex button in a saved menu, e.g. `codex_button:BACK`. Never changes once released. */
+        const val PREFIX = "codex_button:"
+    }
+
     private val mm = MiniMessage.miniMessage()
 
     private val delegate = GenericButtonResolverLayout(
         inner = inner,
-        prefix = "codex_button:",
+        prefix = PREFIX,
         resolver = { type, p, slot -> resolveButton(type, p, slot) },
         id = id,
     )
@@ -145,7 +150,7 @@ class CodexButtonResolverLayout(
             item = item,
             allowPickup = false,
             commands = listOf("codex:nav ${action.name}"),
-            tag = "codex_button:${type}",
+            tag = "$PREFIX$type",
         )
     }
 }

@@ -82,10 +82,11 @@ class CategoryMenuEntry(
 ) : ActionEntry {
 
     override fun ActionTrigger.execute() {
-        if (category.isBlank()) {
-            btcrenaud.questcodex.QuestCodexInitializer.openMainMenu(player)
-        } else {
-            btcrenaud.questcodex.QuestCodexInitializer.openCategoryMenu(player, category)
+        when {
+            category.isBlank() -> btcrenaud.questcodex.QuestCodexInitializer.openMainMenu(player)
+            // "@tracked" is the tracked-quests menu, not a quest category.
+            category.equals("@tracked", ignoreCase = true) -> btcrenaud.questcodex.QuestCodexInitializer.openTrackedQuestsMenu(player)
+            else -> btcrenaud.questcodex.QuestCodexInitializer.openCategoryMenu(player, category)
         }
     }
 

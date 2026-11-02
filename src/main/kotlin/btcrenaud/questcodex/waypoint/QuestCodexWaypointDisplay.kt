@@ -231,6 +231,7 @@ class QuestCodexWaypointDisplay(
     private val states = ConcurrentHashMap<UUID, WaypointPlayerState>()
     private var tickCounter = 0
     private val resolver = WaypointTargetResolver()
+    private val warnedMaterials: MutableSet<Material> = ConcurrentHashMap.newKeySet()
 
     override fun onPlayerAdd(player: Player) {
         states.computeIfAbsent(player.uniqueId) { WaypointPlayerState() }
@@ -689,7 +690,7 @@ class QuestCodexWaypointDisplay(
             }
 
             is WaypointBlockLayer -> {
-                val material = layer.material.get(player, interactionContext)
+                val material = blockMaterialOrNull(layer.material.get(player, interactionContext)) ?: return
                 val payload = listOf(material, quantizedScale)
                 if (payload != active.lastPayload) {
                     active.entity.block(
@@ -710,7 +711,7 @@ class QuestCodexWaypointDisplay(
         angle: Float,
         interactionContext: InteractionContext,
     ) {
-        val material = layer.material.get(player, interactionContext)
+        val material = blockMaterialOrNull(layer.material.get(player, interactionContext)) ?: return
         val requestedHeight = layer.height.get(player, interactionContext)
         val height = if (requestedHeight <= 0) {
             (player.world.maxHeight - player.location.y).coerceAtLeast(1.0).toFloat()
@@ -733,6 +734,21 @@ class QuestCodexWaypointDisplay(
             )
             active.lastPayload = payload
         }
+    }
+
+    /**
+     * The editor offers every material, items included. An item such as `EMERALD` used to throw
+     * on every render, flooding the console while the marker stayed invisible; it is now reported once.
+     */
+    private fun blockMaterialOrNull(material: Material): Material? {
+        if (material.isBlock) return material
+        if (warnedMaterials.add(material)) {
+            plugin.logger.warning(
+                "[QuestCodex] Waypoint '${entry.id}': $material is an item, not a block, so it cannot be " +
+                    "displayed. Pick a block material, such as EMERALD_BLOCK instead of EMERALD."
+            )
+        }
+        return null
     }
 
     private fun clearLayers(state: WaypointPlayerState) {

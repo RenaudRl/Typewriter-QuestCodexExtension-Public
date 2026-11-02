@@ -49,6 +49,7 @@ import com.typewritermc.engine.paper.plugin
 import com.typewritermc.engine.paper.utils.item.CustomItem
 import com.typewritermc.quest.entries.QuestEntry
 import com.typewritermc.quest.QuestStatus
+import com.typewritermc.quest.events.AsyncQuestStatusUpdate
 import com.typewritermc.core.entries.ref
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Bukkit
@@ -110,6 +111,14 @@ object QuestCodexInitializer : Initializable {
                 { QuestCodexTrackingService.restorePrimary(event.player) },
                 null,
                 2L,
+            )
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
+        fun onQuestStatus(event: AsyncQuestStatusUpdate) {
+            if (event.to != QuestStatus.ACTIVE) return
+            QuestCodexTrackingService.followActivated(
+                event.player, event.quest.id, QuestCodexConfig.multiTrackingEnabled,
             )
         }
     }

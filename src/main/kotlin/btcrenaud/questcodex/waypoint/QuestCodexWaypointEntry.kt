@@ -158,7 +158,7 @@ data class WaypointBlockLayer(
     @Help("Whether this layer is rendered for the current player.")
     @Default("true")
     val enabled: Var<Boolean> = ConstVar(true),
-    @Help("Block displayed by the block display.")
+    @Help("Block displayed by the block display. Must be a block: EMERALD_BLOCK works, the EMERALD item does not.")
     @Default("\"BEACON\"")
     val material: Var<Material> = ConstVar(Material.BEACON),
     @Help("Position relative to the selected anchor.")
@@ -181,7 +181,7 @@ data class WaypointBeaconLayer(
     @Help("Controls where the beacon appears: HUD, at the target, or both.")
     @Default("\"TARGET\"")
     val mode: BeaconMode = BeaconMode.TARGET,
-    @Help("Block used for the vertical beacon beam.")
+    @Help("Block used for the vertical beacon beam. Must be a block, not an item.")
     @Default("\"BEACON\"")
     val material: Var<Material> = ConstVar(Material.BEACON),
     @Help("Beam height in blocks. Set to zero to reach the world's maximum height.")

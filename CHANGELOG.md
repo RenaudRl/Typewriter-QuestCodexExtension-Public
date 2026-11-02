@@ -9,6 +9,15 @@
   from the player's eyes. Switching a waypoint layer between Text, Block and Beacon also reset its
   fields to `0`; it now resets them to the layer's real defaults. A new waypoint also starts with
   one text layer showing the distance, as the code always intended.
+- **Fixed: a waypoint following tracked objectives now shows a quest started during the session.**
+  The codex tracking copied the official tracker only the first time it saw a player, and kept that
+  list across reconnections. A player first seen without an active quest therefore stayed
+  untracked until the server restarted, and `tracked_objective_waypoint_target` showed nothing.
+  A quest that becomes active is now tracked, as the official tracker does, and an empty tracking
+  list follows the official tracker again.
+- **Fixed: a block or beacon layer whose material is an item (for example `EMERALD` instead of
+  `EMERALD_BLOCK`) now logs one clear warning.** It used to throw on every render, flooding the
+  console with "Provided material must be a block", and the marker stayed invisible.
 - **Changed: a text layer's `backgroundOpacity` is now a whole number from 0 (no background) to
   255 (opaque).** It was a byte the web editor could not edit at all, capped at 127 (half
   opacity). A page that already holds a number between 0 and 127 keeps the same look.

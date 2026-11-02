@@ -11,6 +11,7 @@ import com.typewritermc.quest.QuestStatus
 import com.typewritermc.quest.entries.QuestEntry
 import com.typewritermc.quest.isQuestTracked
 import com.typewritermc.quest.trackQuest
+import com.typewritermc.quest.trackedQuest
 import com.typewritermc.quest.unTrackQuest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,21 +70,14 @@ object QuestCodexTrackingService {
 
     fun trackedQuestIds(player: Player): List<String> {
         var seeded = false
-        val tracked = trackedQuestIds.computeIfAbsent(player.uniqueId) {
-            LinkedHashSet<String>().apply {
-                Query.find<QuestEntry>()
-                    .firstOrNull { candidate ->
-                        candidate.questStatus(player) == QuestStatus.ACTIVE &&
-                            player isQuestTracked candidate.ref()
-                    }
-                    ?.let {
-                        add(it.id)
-                        seeded = true
-                    }
-            }
-        }
+        val tracked = trackedQuestIds.computeIfAbsent(player.uniqueId) { LinkedHashSet() }
         var changed = false
         val result = synchronized(tracked) {
+            // Seeded whenever empty, not only on creation: the set outlives disconnections, so a
+            // player first seen without an active quest stayed untracked until the server restarted.
+            if (tracked.isEmpty()) {
+                officialTrackedQuestId(player)?.let { seeded = tracked.add(it) }
+            }
             changed = tracked.removeIf { id ->
                 Query.findById<QuestEntry>(id)?.questStatus(player) != QuestStatus.ACTIVE
             }
@@ -96,6 +90,20 @@ object QuestCodexTrackingService {
         if (seeded || changed) markDirty()
         return result
     }
+
+    /**
+     * Tracks a quest that has just become active, as the official tracker always does.
+     * Without it, a quest started during the session never reached the codex tracking,
+     * and the waypoints that follow it stayed hidden.
+     */
+    fun followActivated(player: Player, questId: String, multiTrackingEnabled: Boolean) {
+        val tracked = trackedQuestIds.computeIfAbsent(player.uniqueId) { LinkedHashSet() }
+        val changed = synchronized(tracked) { tracked.follow(questId, multiTrackingEnabled) }
+        if (changed) markDirty()
+    }
+
+    private fun officialTrackedQuestId(player: Player): String? =
+        player.trackedQuest()?.get()?.takeIf { it.questStatus(player) == QuestStatus.ACTIVE }?.id
 
     fun isTracked(player: Player, questId: String): Boolean =
         trackedQuestIds(player).contains(questId)
@@ -219,4 +227,16 @@ object QuestCodexTrackingService {
             if (ids.isNotEmpty()) trackedQuestIds[uuid] = LinkedHashSet(ids)
         }
     }
+}
+
+/**
+ * Adds [questId] as the most recent tracked quest; without multi-tracking it replaces the others,
+ * like the official single tracker. Returns whether the set changed.
+ */
+internal fun LinkedHashSet<String>.follow(questId: String, multiTrackingEnabled: Boolean): Boolean {
+    if (!multiTrackingEnabled) {
+        if (size == 1 && contains(questId)) return false
+        clear()
+    }
+    return add(questId)
 }

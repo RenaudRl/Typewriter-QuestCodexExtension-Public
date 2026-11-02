@@ -3,6 +3,7 @@ package btcrenaud.questcodex.waypoint
 import com.typewritermc.core.books.pages.Colors
 import com.typewritermc.core.extension.annotations.Entry
 import com.typewritermc.core.extension.annotations.Help
+import com.typewritermc.core.extension.annotations.Default
 import com.typewritermc.core.extension.annotations.Tags
 import com.typewritermc.engine.paper.entry.entries.AudienceDisplay
 import com.typewritermc.engine.paper.entry.entries.AudienceEntry
@@ -29,12 +30,15 @@ class QuestCodexLocatorBarEntry(
     override val id: String = "",
     override val name: String = "",
     @Help("Target resolved from a position, active objective or entity.")
+    @Default("{\"case\":\"tracked_objective_waypoint_target\",\"value\":{\"selection\":\"ONE_PER_QUEST\"}}")
     val target: WaypointTarget = TrackedObjectiveWaypointTarget(TrackedObjectiveSelection.ONE_PER_QUEST),
     @Help("Colour of the locator bar dots, in hex format like '#55FF55'.")
+    @Default("\"#55FF55\"")
     val color: Var<String> = ConstVar("#55FF55"),
     @Help("Optional icon style key, for example 'minecraft:default'.")
     val style: Var<String> = ConstVar(""),
     @Help("Maximum number of simultaneous dots.")
+    @Default("5")
     val maxTargets: Int = 5,
 ) : AudienceEntry {
     override suspend fun display(): AudienceDisplay = QuestCodexLocatorBarDisplay(this)

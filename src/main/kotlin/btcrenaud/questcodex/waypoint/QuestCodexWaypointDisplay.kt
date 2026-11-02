@@ -114,14 +114,14 @@ private class PacketWaypointEntity(
         lineWidth: Int,
         shadow: Boolean,
         seeThrough: Boolean,
-        backgroundOpacity: Byte,
+        backgroundOpacity: Int,
     ) {
         wrapper.meta<TextDisplayMeta> {
             text = value
             this.lineWidth = lineWidth.coerceIn(1, 4_096)
             isShadow = shadow
             isSeeThrough = seeThrough
-            backgroundColor = (backgroundOpacity.coerceIn(0, 127).toInt() shl 24) or 0x0F_0F_0F
+            backgroundColor = (backgroundOpacity.coerceIn(0, 255) shl 24) or 0x0F_0F_0F
         }
         wrapper.meta<AbstractDisplayMeta> {
             billboardConstraints = AbstractDisplayMeta.BillboardConstraints.CENTER

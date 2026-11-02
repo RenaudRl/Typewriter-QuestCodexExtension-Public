@@ -8,6 +8,7 @@ import com.typewritermc.core.entries.Ref
 import com.typewritermc.core.entries.emptyRef
 import com.typewritermc.core.extension.annotations.Entry
 import com.typewritermc.core.extension.annotations.Help
+import com.typewritermc.core.extension.annotations.Default
 import com.typewritermc.core.extension.annotations.Placeholder
 import com.typewritermc.core.extension.annotations.Colored
 import com.typewritermc.engine.paper.entry.ManifestEntry
@@ -63,6 +64,7 @@ class CategoryMenuEntry(
     @Colored
     val title: String = "",
     @Help("Number of inventory rows (3-6).")
+    @Default("4")
     val rows: Int = 4,
     @Help("GUI entry providing the layout pool, main layout, type and audio configuration.")
     val menu: Ref<OpenGuiActionEntry> = emptyRef(),
@@ -74,6 +76,8 @@ class CategoryMenuEntry(
     val defaultViewId: String? = null,
     @Help("MiniMessage separator inserted between breadcrumb segments by the {breadcrumb} title token.")
     @Colored
+    // Same value as MenuViewSupport.DEFAULT_BREADCRUMB_SEPARATOR (OmniGUI); an annotation needs a literal here.
+    @Default("\"<#B76BFF> ▸ </#B76BFF>\"")
     val breadcrumbSeparator: String = MenuViewSupport.DEFAULT_BREADCRUMB_SEPARATOR,
     @Help("Shared OpenGui chassis whose layout pool and views are inherited before this menu's own values.")
     val baseMenuId: String = "",

@@ -5,6 +5,7 @@ import com.typewritermc.core.entries.Ref
 import com.typewritermc.core.entries.emptyRef
 import com.typewritermc.core.extension.annotations.Entry
 import com.typewritermc.core.extension.annotations.Help
+import com.typewritermc.core.extension.annotations.Default
 import com.typewritermc.core.utils.launch
 import com.typewritermc.engine.paper.entry.Criteria
 import com.typewritermc.engine.paper.entry.Modifier
@@ -35,6 +36,7 @@ class GrantAdvancementActionEntry(
     @Help("Take the advancement back instead of awarding it.")
     val revoke: Boolean = false,
     @Help("Also award every advancement above this one, so the tree can never show a child earned under an unearned parent.")
+    @Default("true")
     val includeParents: Boolean = true,
 ) : ActionEntry {
     override fun ActionTrigger.execute() {

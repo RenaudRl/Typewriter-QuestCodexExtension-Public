@@ -5,6 +5,7 @@ import com.typewritermc.core.entries.Ref
 import com.typewritermc.core.entries.emptyRef
 import com.typewritermc.core.extension.annotations.Entry
 import com.typewritermc.core.extension.annotations.Help
+import com.typewritermc.core.extension.annotations.Default
 import com.typewritermc.core.extension.annotations.Placeholder
 import com.typewritermc.core.extension.annotations.Colored
 import com.typewritermc.engine.paper.entry.ManifestEntry
@@ -17,58 +18,78 @@ class QuestCodexConfigEntry(
     override val id: String = "",
     override val name: String = "",
     @Help("Sound played when a menu is opened.")
+    @Default("{\"soundId\":{\"type\":\"default\",\"value\":\"minecraft:item.book.page_turn\"},\"soundSource\":{\"type\":\"self\",\"entryId\":\"\",\"location\":{\"world\":\"\",\"x\":0.0,\"y\":0.0,\"z\":0.0,\"yaw\":0.0,\"pitch\":0.0}},\"track\":\"MASTER\",\"volume\":1.0,\"pitch\":1.0}")
     val soundOnOpen: Sound = defaultSound("minecraft:item.book.page_turn"),
     @Help("Sound played when switching between categories/menus.")
+    @Default("{\"soundId\":{\"type\":\"default\",\"value\":\"minecraft:item.flintandsteel.use\"},\"soundSource\":{\"type\":\"self\",\"entryId\":\"\",\"location\":{\"world\":\"\",\"x\":0.0,\"y\":0.0,\"z\":0.0,\"yaw\":0.0,\"pitch\":0.0}},\"track\":\"MASTER\",\"volume\":1.0,\"pitch\":1.0}")
     val soundOnSwitch: Sound = defaultSound("minecraft:item.flintandsteel.use"),
     @Help("Sound played when clicking a navigation button.")
+    @Default("{\"soundId\":{\"type\":\"default\",\"value\":\"minecraft:item.flintandsteel.use\"},\"soundSource\":{\"type\":\"self\",\"entryId\":\"\",\"location\":{\"world\":\"\",\"x\":0.0,\"y\":0.0,\"z\":0.0,\"yaw\":0.0,\"pitch\":0.0}},\"track\":\"MASTER\",\"volume\":1.0,\"pitch\":1.0}")
     val soundOnClick: Sound = defaultSound("minecraft:item.flintandsteel.use"),
     @Help("Sound played when tracking a quest.")
+    @Default("{\"soundId\":{\"type\":\"default\",\"value\":\"minecraft:entity.arrow.hit_player\"},\"soundSource\":{\"type\":\"self\",\"entryId\":\"\",\"location\":{\"world\":\"\",\"x\":0.0,\"y\":0.0,\"z\":0.0,\"yaw\":0.0,\"pitch\":0.0}},\"track\":\"MASTER\",\"volume\":1.0,\"pitch\":1.0}")
     val soundOnTrack: Sound = defaultSound("minecraft:entity.arrow.hit_player"),
     @Help("Sound played when untracking a quest.")
+    @Default("{\"soundId\":{\"type\":\"default\",\"value\":\"minecraft:entity.arrow.hit_player\"},\"soundSource\":{\"type\":\"self\",\"entryId\":\"\",\"location\":{\"world\":\"\",\"x\":0.0,\"y\":0.0,\"z\":0.0,\"yaw\":0.0,\"pitch\":0.0}},\"track\":\"MASTER\",\"volume\":1.0,\"pitch\":1.0}")
     val soundOnUntrack: Sound = defaultSound("minecraft:entity.arrow.hit_player"),
     @Help("Default number of inventory rows for category menus (3-6).")
+    @Default("4")
     val defaultRows: Int = 4,
     @Help("Allow QuestCodex to track several active quests while the official Quest tracker displays the most recently selected one.")
+    @Default("true")
     val multiTrackingEnabled: Boolean = true,
     @Help("Maximum number of quests tracked simultaneously by QuestCodex.")
+    @Default("5")
     val maxTrackedQuests: Int = 5,
     @Help("Artifact used to persist each player's tracked quest ids and their tracking order.")
     val trackingArtifact: Ref<QuestCodexTrackingArtifactEntry> = emptyRef(),
     @Help("Enable safe recovery of active Typewriter dialogues and cinematics after a disconnect.")
+    @Default("true")
     val recoveryEnabled: Boolean = true,
     @Help("Artifact used to persist active dialogue and cinematic recovery snapshots.")
     val recoveryArtifact: Ref<QuestCodexRecoveryArtifactEntry> = emptyRef(),
     @Help("How long an interrupted interaction remains restorable, in seconds.")
+    @Default("120")
     val recoveryRetentionSeconds: Long = 120,
     @Help("Ticks to wait after join before restoring an interrupted interaction.")
+    @Default("2")
     val recoveryRestoreDelayTicks: Long = 2,
 
     @Help("Message shown when a player starts tracking a quest. Placeholders: {quest}")
     @Placeholder @Colored
+    @Default("\"<green>Now tracking: {quest}</green>\"")
     val nowTrackingMessage: String = "<green>Now tracking: {quest}</green>",
     @Help("Message shown when a player stops tracking a quest. Placeholders: {quest}")
     @Placeholder @Colored
+    @Default("\"<gray>No longer tracking: {quest}</gray>\"")
     val stoppedTrackingMessage: String = "<gray>No longer tracking: {quest}</gray>",
     @Help("Message shown when clicking an inactive quest. Placeholders: {quest}")
     @Placeholder @Colored
+    @Default("\"<gold>{quest} — Start this quest!</gold>\"")
     val questInactiveMessage: String = "<gold>{quest} — Start this quest!</gold>",
     @Help("Message shown when clicking a completed quest. Placeholders: {quest}")
     @Placeholder @Colored
+    @Default("\"<green>{quest} — Completed!</green>\"")
     val questCompletedMessage: String = "<green>{quest} — Completed!</green>",
     @Help("Lore line showing category progress. Placeholders: {completed}, {total}")
     @Placeholder @Colored
+    @Default("\"<gray>{completed}/{total} quests</gray>\"")
     val categoryProgressMessage: String = "<gray>{completed}/{total} quests</gray>",
     @Help("Lore hint telling the player to click to see quests.")
     @Placeholder @Colored
+    @Default("\"<yellow>Click to view quests</yellow>\"")
     val categoryClickHint: String = "<yellow>Click to view quests</yellow>",
     @Help("Lore hint telling the player to click to track/un-track this quest.")
     @Placeholder @Colored
+    @Default("\"<yellow>Click to track</yellow>\"")
     val questTrackHint: String = "<yellow>Click to track</yellow>",
     @Help("Lore hint shown for a quest already tracked by QuestCodex.")
     @Placeholder @Colored
+    @Default("\"<yellow>Click to stop tracking</yellow>\"")
     val questUntrackHint: String = "<yellow>Click to stop tracking</yellow>",
     @Help("Message shown when the simultaneous tracking limit is reached. Placeholder: {max}.")
     @Placeholder @Colored
+    @Default("\"<red>You can track at most {max} quests.</red>\"")
     val trackingLimitMessage: String = "<red>You can track at most {max} quests.</red>",
     @Help("Entry triggered to open the main menu (e.g. an open_gui entry) when no category_menu with an empty category exists. Used by /tw codex and the BACK button.")
     val mainMenuTrigger: Ref<TriggerableEntry> = emptyRef(),
@@ -79,12 +100,15 @@ class QuestCodexConfigEntry(
     val sortTexts: CodexSortTexts = CodexSortTexts(),
     @Help("Title of the main menu when its category_menu entry has no title.")
     @Placeholder @Colored
+    @Default("\"<dark_gray>Quest Codex\"")
     val mainMenuTitle: String = "<dark_gray>Quest Codex",
     @Help("Title of the tracked quests menu when its category_menu entry has no title.")
     @Placeholder @Colored
+    @Default("\"<gold>Tracked quests\"")
     val trackedQuestsTitle: String = "<gold>Tracked quests",
     @Help("Error shown when a player runs /tw codex with a category that does not exist. Supports MiniMessage. Placeholders: {category}")
     @Colored
+    @Default("\"Unknown category: {category}\"")
     val unknownCategoryMessage: String = "Unknown category: {category}",
 ) : ManifestEntry
 

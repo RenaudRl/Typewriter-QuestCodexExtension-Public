@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.17.2 — unreleased
+
+- **Fixed: entries created in the web editor now start with the intended default values.** The
+  editor only knows defaults declared with `@Default`, so every numeric and boolean setting of a
+  new entry used to start at `0`/`false` (and enums, materials and target types at their first
+  value). A new `quest_codex_waypoint` was therefore invisible: its marker was projected 1 block
+  from the player's eyes. Switching a waypoint layer between Text, Block and Beacon also reset its
+  fields to `0`; it now resets them to the layer's real defaults. A new waypoint also starts with
+  one text layer showing the distance, as the code always intended.
+- **Changed: a text layer's `backgroundOpacity` is now a whole number from 0 (no background) to
+  255 (opaque).** It was a byte the web editor could not edit at all, capped at 127 (half
+  opacity). A page that already holds a number between 0 and 127 keeps the same look.
+- **Existing pages keep their stored values.** An entry created before this version still holds
+  the zeros it was saved with: recreate it, or set its values by hand.
+
 ## 2.17.1 — 2026-10-30
 
 - **Fixed: a Category Menu whose category is `@tracked` now opens the tracked-quests menu**, where

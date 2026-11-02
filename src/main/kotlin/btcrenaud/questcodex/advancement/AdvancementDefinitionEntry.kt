@@ -6,6 +6,7 @@ import com.typewritermc.core.entries.emptyRef
 import com.typewritermc.core.extension.annotations.Colored
 import com.typewritermc.core.extension.annotations.Entry
 import com.typewritermc.core.extension.annotations.Help
+import com.typewritermc.core.extension.annotations.Default
 import com.typewritermc.core.extension.annotations.Tags
 import com.typewritermc.engine.paper.entry.ManifestEntry
 import org.bukkit.Material
@@ -50,12 +51,14 @@ class AdvancementDefinitionEntry(
     override val id: String = "",
     override val name: String = "",
     @Help("Namespace of the advancement id. Lowercase letters, digits, '_', '.' and '-' only.")
+    @Default("\"questcodex\"")
     val namespace: String = "questcodex",
     @Help("Key of the advancement id, unique within the namespace. '/' creates a folder.")
     val key: String = "",
     @Help("Advancement this one hangs under. Leave empty to make it the root of its own tab.")
     val parent: Ref<AdvancementDefinitionEntry> = emptyRef(),
     @Help("Item shown as the advancement icon.")
+    @Default("\"BOOK\"")
     val icon: Material = Material.BOOK,
     @Help("Title shown in the tree and on the toast.")
     @Colored
@@ -68,6 +71,7 @@ class AdvancementDefinitionEntry(
     @Help("Tab background sprite, e.g. 'minecraft:gui/advancements/backgrounds/stone'. Only used on a root advancement.")
     val background: String = "",
     @Help("Whether earning this advancement pops a toast on screen.")
+    @Default("true")
     val showToast: Boolean = true,
     @Help("Whether earning this advancement is announced in chat.")
     val announceToChat: Boolean = false,

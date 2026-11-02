@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.17.2 — unreleased
+## 2.17.2 — 2026-11-02
 
 - **Fixed: entries created in the web editor now start with the intended default values.** The
   editor only knows defaults declared with `@Default`, so every numeric and boolean setting of a

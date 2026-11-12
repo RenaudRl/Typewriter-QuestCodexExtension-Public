@@ -14,6 +14,9 @@
   `description` field: shown at the top of the quest button in every state, above the objectives.
   Write `<description>` in a lore to place it elsewhere. Empty by default, existing entries are unchanged.
 - **Fixed: `hideObjectivesWhenInProgress` now hides the objectives.** The option was saved but had no effect.
+- **Fixed: a quest no longer disappears from its category when a state item is left empty.** The web editor
+  saves an untouched `notStartedItem`, `inProgressItem` or `completedItem` without a material, and the quest
+  button was drawn as air. It now falls back to the default icon (book, clock, emerald).
 
 ## 2.17.2 — 2026-11-02
 

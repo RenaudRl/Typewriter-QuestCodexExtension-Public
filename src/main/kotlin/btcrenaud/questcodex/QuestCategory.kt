@@ -50,11 +50,12 @@ data class QuestItemOverrides(
     fun hasOverrides(): Boolean =
         notStarted != Item.Empty || inProgress != Item.Empty || completed != Item.Empty
 
-    fun itemFor(status: QuestStatus): Item = when (status) {
+    /** Null when the state's item has no material: the editor saves an untouched item that way, and it renders as air. */
+    fun itemFor(status: QuestStatus): Item? = when (status) {
         QuestStatus.INACTIVE -> notStarted
         QuestStatus.ACTIVE -> inProgress
         QuestStatus.COMPLETED -> completed
-    }
+    }.takeUnless { it.isEffectivelyEmpty() }
 
     fun overrideWith(other: QuestItemOverrides): QuestItemOverrides = QuestItemOverrides(
         notStarted = if (other.notStarted != Item.Empty) other.notStarted else notStarted,

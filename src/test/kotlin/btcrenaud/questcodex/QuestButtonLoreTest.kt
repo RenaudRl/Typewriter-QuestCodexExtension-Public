@@ -1,11 +1,14 @@
 package btcrenaud.questcodex
 
+import btcrenaud.questcodex.entries.QuestCodexConfig
 import btcrenaud.questcodex.entries.QuestCodexConfigEntry
 import btcrenaud.questcodex.entries.QuestLoreDefaults
+import com.typewritermc.core.serialization.createDataSerializerGson
 import com.typewritermc.quest.QuestStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /** Guards which lines a quest button shows, from the defaults, the overrides and the active objectives. */
 class QuestButtonLoreTest {
@@ -125,6 +128,48 @@ class QuestButtonLoreTest {
         val lines = QuestButtonLore.compose(QuestStatus.INACTIVE, QuestLoreDefaults(), null, listOf("<description>", "b"), emptyList())
 
         assertEquals(listOf("b"), lines)
+    }
+
+    @Test
+    fun `a styled token line with nothing to show is dropped`() {
+        val lines = QuestButtonLore.compose(QuestStatus.ACTIVE, enabled, null, listOf("<gold><objectives></gold>", "b"), emptyList())
+
+        assertEquals(listOf("b"), lines)
+    }
+
+    @Test
+    fun `objectives token inside the description is replaced`() {
+        val lines = QuestButtonLore.compose(
+            QuestStatus.ACTIVE, QuestLoreDefaults(), null, emptyList(), listOf("o"), listOf("Goal: <objectives>"),
+        )
+
+        assertEquals(listOf("Goal: o"), lines)
+    }
+
+    @Test
+    fun `assignment lore keeps the automatic objectives below it`() {
+        val lines = QuestButtonLore.compose(QuestStatus.ACTIVE, enabled, override(listOf("x")), emptyList(), listOf("o"))
+
+        assertEquals(listOf("x", "header", "o"), lines)
+    }
+
+    @Test
+    fun `objectives are only computed when something will show them`() {
+        assertFalse(QuestButtonLore.needsObjectives(QuestStatus.ACTIVE, QuestLoreDefaults(), listOf("plain")))
+        assertTrue(QuestButtonLore.needsObjectives(QuestStatus.ACTIVE, QuestLoreDefaults(), listOf("<objectives>")))
+        assertTrue(QuestButtonLore.needsObjectives(QuestStatus.ACTIVE, enabled, emptyList()))
+        assertFalse(QuestButtonLore.needsObjectives(QuestStatus.COMPLETED, enabled, emptyList()))
+    }
+
+    @Test
+    fun `a quest_codex page saved before the update loads with the default lore off`() {
+        val gson = createDataSerializerGson(emptyList())
+
+        val entry = gson.fromJson("""{"id":"codex","name":"codex"}""", QuestCodexConfigEntry::class.java)
+        QuestCodexConfig.apply(entry)
+
+        assertEquals(QuestLoreDefaults(), QuestCodexConfig.questLoreDefaults)
+        QuestCodexConfig.reset()
     }
 
     @Test

@@ -37,6 +37,8 @@ repositories {
 
 dependencies {
     testImplementation(kotlin("test"))
+    // The engine's entry Gson reads Kotlin metadata; the server ships kotlin-reflect, the tests must name it.
+    testImplementation(kotlin("reflect"))
     testImplementation("com.google.code.gson:gson:2.13.1")
     // Adventure reaches compilation through paper-api, and compileOnly carries no transitives to
     // the test runtime — so a test that exercises the real MiniMessage-to-JSON conversion, rather

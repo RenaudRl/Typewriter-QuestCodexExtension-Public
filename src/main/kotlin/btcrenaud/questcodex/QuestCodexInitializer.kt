@@ -1096,19 +1096,20 @@ object QuestCodexInitializer : Initializable {
             ?: quest.displayName.get(player).parsePlaceholders(player)
         meta.displayName(name.asMiniWithoutItalic())
 
-        val objectives = if (status == QuestStatus.ACTIVE) {
-            player.questShowingObjectives(quest.ref())
-                .sortedByDescending { it.priorityOverride.orElse(0) }
-                .map { it.display(player) }
-                .toList()
+        val defaults = QuestCodexConfig.questLoreDefaults
+        val stateOverride = displayOverrides?.state(status)
+        val additional = additionalLore?.forStatus(status).orEmpty()
+        val configured = stateOverride?.lore.orEmpty() + additional
+        val objectives = if (QuestButtonLore.needsObjectives(status, defaults, configured)) {
+            player.questShowingObjectives(quest.ref()).map { it.display(player) }.toList()
         } else {
             emptyList()
         }
         val loreLines = QuestButtonLore.compose(
             status = status,
-            defaults = QuestCodexConfig.questLoreDefaults,
-            override = displayOverrides?.state(status),
-            additional = additionalLore?.forStatus(status).orEmpty(),
+            defaults = defaults,
+            override = stateOverride,
+            additional = additional,
             objectives = objectives,
             description = additionalLore?.description.orEmpty(),
         ).toMutableList()

@@ -16,8 +16,14 @@ object QuestButtonLore {
     const val OBJECTIVES_TOKEN = "<objectives>"
     const val DESCRIPTION_TOKEN = "<description>"
 
+    private val MINI_MESSAGE_TAG = Regex("<[^>]*>")
+
+    /** Whether the button needs the player's objectives at all; they are not computed otherwise. */
+    fun needsObjectives(status: QuestStatus, defaults: QuestLoreDefaults, configured: List<String>): Boolean =
+        status == QuestStatus.ACTIVE && (defaults.enabled || configured.any { OBJECTIVES_TOKEN in it })
+
     /**
-     * @param objectives the rendered objectives the player currently sees, highest priority first.
+     * @param objectives the rendered objectives the player currently sees.
      * @param description the quest description lines, shown in every state.
      * @return lines that may still contain `\n`; the caller splits them.
      */
@@ -39,12 +45,11 @@ object QuestButtonLore {
         } else {
             emptyList()
         }
-        val tokens = mapOf(
-            OBJECTIVES_TOKEN to visible.joinToString("\n"),
-            DESCRIPTION_TOKEN to description.joinToString("\n"),
-        )
+        val objectivesOnly = mapOf(OBJECTIVES_TOKEN to visible.joinToString("\n"))
+        val tokens = objectivesOnly + (DESCRIPTION_TOKEN to description.joinToString("\n"))
 
-        return top + (base + automatic + additional).mapNotNull { line -> line.withTokens(tokens) }
+        return top.mapNotNull { it.withTokens(objectivesOnly) } +
+            (base + automatic + additional).mapNotNull { it.withTokens(tokens) }
     }
 
     private fun QuestLoreDefaults.messageFor(status: QuestStatus): List<String> {
@@ -56,9 +61,10 @@ object QuestButtonLore {
         return if (message.isBlank()) emptyList() else listOf(message)
     }
 
-    /** `null` when the line held only tokens and there is nothing to put in their place. */
+    /** `null` when the line held only tokens (and styling) and there is nothing to put in their place. */
     private fun String.withTokens(tokens: Map<String, String>): String? {
         if (tokens.keys.none { it in this }) return this
-        return tokens.entries.fold(this) { line, (token, value) -> line.replace(token, value) }.ifBlank { null }
+        val replaced = tokens.entries.fold(this) { line, (token, value) -> line.replace(token, value) }
+        return replaced.takeUnless { it.replace(MINI_MESSAGE_TAG, "").isBlank() }
     }
 }

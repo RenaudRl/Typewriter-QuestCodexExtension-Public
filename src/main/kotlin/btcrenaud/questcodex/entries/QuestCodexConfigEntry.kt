@@ -229,7 +229,9 @@ object QuestCodexConfig {
         categoryClickHint = entry.categoryClickHint
         questTrackHint = entry.questTrackHint
         questUntrackHint = entry.questUntrackHint
-        questLoreDefaults = entry.questLoreDefaults
+        // A quest_codex page saved before 2.18 has no questLoreDefaults: keep the codex unchanged even
+        // if the loader hands the absent object over as null.
+        questLoreDefaults = entry.questLoreDefaults ?: QuestLoreDefaults()
         trackingLimitMessage = entry.trackingLimitMessage
         mainMenuTrigger = entry.mainMenuTrigger
         navLabels = entry.navLabels

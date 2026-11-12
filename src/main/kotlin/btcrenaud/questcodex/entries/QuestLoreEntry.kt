@@ -34,6 +34,11 @@ class QuestLoreEntry(
     val quest: Ref<com.typewritermc.quest.entries.QuestEntry> = emptyRef(),
     @Help("Category this lore applies to. Leave empty to apply globally.")
     val category: String = "",
+    @Help("Description of the quest, shown at the top of its button in every state. Write <description> in a lore to place it elsewhere.")
+    @Placeholder
+    @Colored
+    @MultiLine
+    val description: String = "",
     @Help("Additional lore shown when the quest has not started.")
     @Placeholder
     @Colored

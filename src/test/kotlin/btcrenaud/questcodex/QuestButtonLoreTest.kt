@@ -97,6 +97,37 @@ class QuestButtonLoreTest {
     }
 
     @Test
+    fun `description comes first, then the objectives, in every state and even with defaults off`() {
+        val description = listOf("Find the relic.")
+
+        assertEquals(
+            listOf("Find the relic.", "header", "o", "b"),
+            QuestButtonLore.compose(QuestStatus.ACTIVE, enabled, null, listOf("b"), listOf("o"), description),
+        )
+        assertEquals(
+            listOf("Find the relic."),
+            QuestButtonLore.compose(QuestStatus.INACTIVE, QuestLoreDefaults(), null, emptyList(), emptyList(), description),
+        )
+    }
+
+    @Test
+    fun `description token places it and removes it from the top`() {
+        val lines = QuestButtonLore.compose(
+            QuestStatus.COMPLETED, QuestLoreDefaults(), override(listOf("<gold><description>")), emptyList(), emptyList(),
+            listOf("Find the relic."),
+        )
+
+        assertEquals(listOf("<gold>Find the relic."), lines)
+    }
+
+    @Test
+    fun `description token without description drops its line`() {
+        val lines = QuestButtonLore.compose(QuestStatus.INACTIVE, QuestLoreDefaults(), null, listOf("<description>", "b"), emptyList())
+
+        assertEquals(listOf("b"), lines)
+    }
+
+    @Test
     fun `public defaults are off and in english`() {
         assertEquals(
             QuestLoreDefaults(false, "<gray>Not started yet", "<gold>Objectives:", "<green>Quest completed"),

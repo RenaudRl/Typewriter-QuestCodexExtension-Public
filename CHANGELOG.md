@@ -10,6 +10,9 @@
 - **New: `<objectives>` token.** Write it in a `quest_assignment` or `quest_lore` lore to place the active
   objectives where you want; the automatic list is then not added a second time. Works even with the
   default lore turned off.
+- **New: quest description.** Typewriter's `quest` entry has no description, so `quest_lore` gets a
+  `description` field: shown at the top of the quest button in every state, above the objectives.
+  Write `<description>` in a lore to place it elsewhere. Empty by default, existing entries are unchanged.
 - **Fixed: `hideObjectivesWhenInProgress` now hides the objectives.** The option was saved but had no effect.
 
 ## 2.17.2 — 2026-11-02

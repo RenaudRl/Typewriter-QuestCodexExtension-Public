@@ -1110,6 +1110,7 @@ object QuestCodexInitializer : Initializable {
             override = displayOverrides?.state(status),
             additional = additionalLore?.forStatus(status).orEmpty(),
             objectives = objectives,
+            description = additionalLore?.description.orEmpty(),
         ).toMutableList()
 
         // Track hint
@@ -1152,6 +1153,7 @@ object QuestCodexInitializer : Initializable {
     }
 
     private fun QuestLoreEntry.toAdditionalLore(): QuestAdditionalLore = QuestAdditionalLore(
+        description = parseLines(description),
         notStarted = parseLines(notStartedLore),
         inProgress = parseLines(inProgressLore),
         completed = parseLines(completedLore),

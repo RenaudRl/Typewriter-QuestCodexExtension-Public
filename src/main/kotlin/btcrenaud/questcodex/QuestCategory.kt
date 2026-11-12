@@ -102,14 +102,16 @@ data class QuestDisplayOverrides(
 }
 
 data class QuestAdditionalLore(
+    val description: List<String> = emptyList(),
     val notStarted: List<String> = emptyList(),
     val inProgress: List<String> = emptyList(),
     val completed: List<String> = emptyList(),
 ) {
     fun hasContent(): Boolean =
-        notStarted.isNotEmpty() || inProgress.isNotEmpty() || completed.isNotEmpty()
+        description.isNotEmpty() || notStarted.isNotEmpty() || inProgress.isNotEmpty() || completed.isNotEmpty()
 
     fun overrideWith(other: QuestAdditionalLore): QuestAdditionalLore = QuestAdditionalLore(
+        description = if (other.description.isNotEmpty()) other.description else description,
         notStarted = if (other.notStarted.isNotEmpty()) other.notStarted else notStarted,
         inProgress = if (other.inProgress.isNotEmpty()) other.inProgress else inProgress,
         completed = if (other.completed.isNotEmpty()) other.completed else completed,

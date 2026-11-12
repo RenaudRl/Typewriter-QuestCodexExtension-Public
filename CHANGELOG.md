@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.18.0 — unreleased
 
 - **New: default lore for quest buttons.** Turn on `questLoreDefaults.enabled` in `quest_codex` and every
   quest button shows a lore without any per-quest setup: a message for not started and completed quests,

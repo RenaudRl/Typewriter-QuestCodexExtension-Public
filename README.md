@@ -86,6 +86,25 @@ cd Typewriter-QuestCodexExtension-Public
 
 Full documentation available at [BTC Studio Docs](https://docs.borntocraftstudio.net/extensions/free/questcodex/).
 
+## Quest button lore
+
+Set `questLoreDefaults.enabled` in `quest_codex` to give every quest button a lore without per-quest setup
+(off by default, so an existing codex does not change):
+
+| Quest state | Shown by default |
+| --- | --- |
+| Not started | `notStartedMessage` |
+| In progress | `objectivesHeader`, then every objective the player currently sees (Typewriter's own rendering, coloured by the `quest.objective.*` snippets) |
+| Completed | `completedMessage` |
+
+Typewriter's `quest` entry has no description, so `quest_lore` has a `description` field, shown at the top of the
+button in every state. Lines are added in this order: description, `quest_assignment` lore of the state (it
+replaces the default message), automatic objective list, `quest_lore` lines of the state, tracking hint.
+
+Write `<objectives>` or `<description>` in a `quest_assignment` or `quest_lore` lore to place that part yourself;
+it is then not added a second time. `hideObjectivesWhenInProgress` removes the objectives. Leave a message empty
+to hide it.
+
 ## Interaction recovery
 
 Create one `quest_codex_recovery_artifact` entry and link it from the global

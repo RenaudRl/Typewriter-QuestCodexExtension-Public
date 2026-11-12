@@ -87,6 +87,8 @@ class QuestCodexConfigEntry(
     @Placeholder @Colored
     @Default("\"<yellow>Click to stop tracking</yellow>\"")
     val questUntrackHint: String = "<yellow>Click to stop tracking</yellow>",
+    @Help("Default lore of quest buttons (messages per state and the list of active objectives). Write <objectives> in a quest_assignment or quest_lore to place the list yourself.")
+    val questLoreDefaults: QuestLoreDefaults = QuestLoreDefaults(),
     @Help("Message shown when the simultaneous tracking limit is reached. Placeholder: {max}.")
     @Placeholder @Colored
     @Default("\"<red>You can track at most {max} quests.</red>\"")
@@ -156,6 +158,8 @@ object QuestCodexConfig {
         private set
     var questUntrackHint: String = "<yellow>Click to stop tracking</yellow>"
         private set
+    var questLoreDefaults: QuestLoreDefaults = QuestLoreDefaults()
+        private set
     var trackingLimitMessage: String = "<red>You can track at most {max} quests.</red>"
         private set
     var mainMenuTrigger: Ref<TriggerableEntry> = emptyRef()
@@ -193,6 +197,7 @@ object QuestCodexConfig {
         categoryClickHint = "<yellow>Click to view quests</yellow>"
         questTrackHint = "<yellow>Click to track</yellow>"
         questUntrackHint = "<yellow>Click to stop tracking</yellow>"
+        questLoreDefaults = QuestLoreDefaults()
         trackingLimitMessage = "<red>You can track at most {max} quests.</red>"
         mainMenuTrigger = emptyRef()
         navLabels = CodexNavLabels()
@@ -224,6 +229,7 @@ object QuestCodexConfig {
         categoryClickHint = entry.categoryClickHint
         questTrackHint = entry.questTrackHint
         questUntrackHint = entry.questUntrackHint
+        questLoreDefaults = entry.questLoreDefaults
         trackingLimitMessage = entry.trackingLimitMessage
         mainMenuTrigger = entry.mainMenuTrigger
         navLabels = entry.navLabels

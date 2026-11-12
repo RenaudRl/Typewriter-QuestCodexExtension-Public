@@ -48,6 +48,7 @@ import com.typewritermc.engine.paper.extensions.placeholderapi.parsePlaceholders
 import com.typewritermc.engine.paper.plugin
 import com.typewritermc.engine.paper.utils.item.CustomItem
 import com.typewritermc.quest.entries.QuestEntry
+import com.typewritermc.quest.entries.questShowingObjectives
 import com.typewritermc.quest.QuestStatus
 import com.typewritermc.quest.events.AsyncQuestStatusUpdate
 import com.typewritermc.core.entries.ref
@@ -1095,13 +1096,21 @@ object QuestCodexInitializer : Initializable {
             ?: quest.displayName.get(player).parsePlaceholders(player)
         meta.displayName(name.asMiniWithoutItalic())
 
-        // Lore
-        val loreLines = mutableListOf<String>()
-        val stateOverride = displayOverrides?.state(status)
-        stateOverride?.lore?.let { loreLines.addAll(it) }
-
-        // Additional lore
-        additionalLore?.forStatus(status)?.let { loreLines.addAll(it) }
+        val objectives = if (status == QuestStatus.ACTIVE) {
+            player.questShowingObjectives(quest.ref())
+                .sortedByDescending { it.priorityOverride.orElse(0) }
+                .map { it.display(player) }
+                .toList()
+        } else {
+            emptyList()
+        }
+        val loreLines = QuestButtonLore.compose(
+            status = status,
+            defaults = QuestCodexConfig.questLoreDefaults,
+            override = displayOverrides?.state(status),
+            additional = additionalLore?.forStatus(status).orEmpty(),
+            objectives = objectives,
+        ).toMutableList()
 
         // Track hint
         if (status == QuestStatus.ACTIVE) {

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **New: default lore for quest buttons.** Turn on `questLoreDefaults.enabled` in `quest_codex` and every
+  quest button shows a lore without any per-quest setup: a message for not started and completed quests,
+  and the objectives the player currently sees for quests in progress (all of them when several run in
+  parallel, highest priority first, coloured by Typewriter's `quest.objective.*` snippets). Off by
+  default: an existing codex looks exactly the same after the update.
+- **New: `<objectives>` token.** Write it in a `quest_assignment` or `quest_lore` lore to place the active
+  objectives where you want; the automatic list is then not added a second time. Works even with the
+  default lore turned off.
+- **Fixed: `hideObjectivesWhenInProgress` now hides the objectives.** The option was saved but had no effect.
+
 ## 2.17.2 — 2026-11-02
 
 - **Fixed: entries created in the web editor now start with the intended default values.** The

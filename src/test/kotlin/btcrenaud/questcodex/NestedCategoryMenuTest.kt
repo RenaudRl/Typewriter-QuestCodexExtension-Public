@@ -104,6 +104,15 @@ class NestedCategoryMenuTest {
         assertNull(a.nearestInLineage { false })
     }
 
+    @Test
+    fun `a sub-category cycle ends the quest flattening instead of overflowing`() {
+        val a = category("a", null, 0, "qa")
+        val b = category("b", a, 0, "qb")
+        b.subCategories.add(a)
+
+        assertEquals(listOf("qa", "qb"), a.questRefs(QuestScope.TREE).ids())
+    }
+
     // ── Marker types per menu kind ──
 
     @Test

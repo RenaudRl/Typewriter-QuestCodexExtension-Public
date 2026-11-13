@@ -988,7 +988,8 @@ object QuestCodexInitializer : Initializable {
     private fun backTargetOf(menuId: String): QuestCategory? {
         if (!menuId.startsWith(CATEGORY_MENU_ID_PREFIX)) return null
         val parent = QuestCategoryRegistry.find(menuId.removePrefix(CATEGORY_MENU_ID_PREFIX))?.parent
-        return parent?.takeIf { menuEntryFor(it) != null }
+        // A parent whose nearest menu cannot render would leave BACK doing nothing: use the fallback instead.
+        return parent?.takeIf { menuEntryFor(it)?.usesLayoutPool == true }
     }
 
     /** Number of indexed slots [menuConfig]'s own layout pool tags with [type]; 0 when the kind has no such marker. */

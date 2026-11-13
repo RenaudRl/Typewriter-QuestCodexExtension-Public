@@ -249,8 +249,12 @@ private fun QuestCategory.rankOf(questId: String, position: Int): Pair<Int, Int>
  * The result depends on configuration only — never on the viewing player — so filtering it later
  * (visibility, sort mode, tracking) can remove entries but can never reshuffle the survivors.
  */
-fun QuestCategory.orderedQuestRefs(): List<Ref<QuestEntry>> {
-    val nested = orderedSubCategories().flatMap { it.orderedQuestRefs() }
+fun QuestCategory.orderedQuestRefs(): List<Ref<QuestEntry>> = orderedQuestRefs(mutableSetOf())
+
+// `visited` stops a misconfigured parent cycle instead of overflowing the stack at render.
+private fun QuestCategory.orderedQuestRefs(visited: MutableSet<String>): List<Ref<QuestEntry>> {
+    if (!visited.add(name.lowercase())) return emptyList()
+    val nested = orderedSubCategories().flatMap { it.orderedQuestRefs(visited) }
     return (ownOrderedQuestRefs() + nested).distinctBy { it.id }
 }
 

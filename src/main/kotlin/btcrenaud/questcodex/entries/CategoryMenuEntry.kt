@@ -59,7 +59,7 @@ class CategoryMenuEntry(
     override val triggers: List<Ref<TriggerableEntry>> = emptyList(),
     @Help("Category this menu configuration applies to. Leave empty for main menu. Also draws every sub-category that has no menu of its own.")
     val category: String = "",
-    @Help("Menu title shown to the player. Supports MiniMessage and PlaceholderAPI.")
+    @Help("Menu title shown to the player. Supports MiniMessage and PlaceholderAPI. When this menu also serves sub-categories without their own menu, a non-empty title is shared by all of them; leave it empty to show each category's own title.")
     @Placeholder
     @Colored
     val title: String = "",

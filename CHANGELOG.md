@@ -22,6 +22,10 @@
 - **New: quest description.** Typewriter's `quest` entry has no description, so `quest_lore` gets a
   `description` field: shown at the top of the quest button in every state, above the objectives.
   Write `<description>` in a lore to place it elsewhere. Empty by default, existing entries are unchanged.
+- **Fixed: a quest declared in a sub-category keeps its `quest_assignment` names, items and lore in the
+  parent's menu.** A menu without `CATEGORY_SLOT` flattens the sub-categories, and those quests fell back to
+  the plain quest name. The parent's own assignment still wins when both exist.
+- **Fixed: a locked category no longer shows the "click" hint** (`categoryClickHint`) in its button.
 - **Fixed: `hideObjectivesWhenInProgress` now hides the objectives.** The option was saved but had no effect.
 - **Fixed: a quest no longer disappears from its category when a state item is left empty.** The web editor
   saves an untouched `notStartedItem`, `inProgressItem` or `completedItem` without a material, and the quest

@@ -1120,7 +1120,9 @@ object QuestCodexInitializer : Initializable {
         val completed = quests.count { it.questStatus(player) == QuestStatus.COMPLETED }
 
         loreLines.add(QuestCodexConfig.categoryProgressMessage.replace("{completed}", completed.toString()).replace("{total}", total.toString()))
-        loreLines.add(QuestCodexConfig.categoryClickHint)
+        // Fix 2: a locked category cannot be opened, so the configurable click hint is not shown for it
+        // (the text itself stays editable in the config entry; no new field needed).
+        if (status != CategoryStatus.BLOCKED) loreLines.add(QuestCodexConfig.categoryClickHint)
 
         when (status) {
             CategoryStatus.BLOCKED -> loreLines.addAll(category.blockedMessage)
@@ -1135,9 +1137,9 @@ object QuestCodexInitializer : Initializable {
 
     private fun buildQuestIcon(player: Player, quest: QuestEntry, category: QuestCategory): ItemStack {
         val status = quest.questStatus(player)
-        val overrides = category.questItems[quest.id]
-        val displayOverrides = category.questDisplays[quest.id]
-        val additionalLore = category.questAdditionalLore[quest.id]
+        val overrides = category.itemOverridesFor(quest.id)
+        val displayOverrides = category.displayOverridesFor(quest.id)
+        val additionalLore = category.additionalLoreFor(quest.id)
 
         // Base item
         val item = overrides?.itemFor(status)?.build(player)
@@ -1199,7 +1201,7 @@ object QuestCodexInitializer : Initializable {
         return questRefs(scope).mapNotNull { it.get() }
             .filter { quest ->
                 val status = quest.questStatus(player)
-                val display = questDisplays[quest.id]
+                val display = displayOverridesFor(quest.id)
                 when (status) {
                     QuestStatus.INACTIVE -> !(display?.notStarted?.hideQuest ?: false)
                     QuestStatus.ACTIVE -> !(display?.inProgress?.hideQuest ?: false)

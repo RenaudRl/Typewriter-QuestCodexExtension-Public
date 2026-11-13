@@ -299,6 +299,28 @@ fun QuestCategory.questRefs(scope: QuestScope): List<Ref<QuestEntry>> = when (sc
     QuestScope.TREE -> orderedQuestRefs()
 }
 
+/**
+ * First non-null [pick] over this category, then its sub-categories depth-first in display order.
+ *
+ * Rule for a flattened (TREE) menu: an assignment made in the category being shown wins, otherwise
+ * the one of the descendant that declares the quest applies. Without this fallback a quest declared
+ * in a sub-category lost its per-state names/items/lore as soon as its parent's menu listed it.
+ */
+fun <T> QuestCategory.firstInTree(pick: (QuestCategory) -> T?): T? = firstInTree(mutableSetOf(), pick)
+
+private fun <T> QuestCategory.firstInTree(visited: MutableSet<String>, pick: (QuestCategory) -> T?): T? {
+    if (!visited.add(name.lowercase())) return null
+    pick(this)?.let { return it }
+    for (sub in orderedSubCategories()) sub.firstInTree(visited, pick)?.let { return it }
+    return null
+}
+
+fun QuestCategory.itemOverridesFor(questId: String): QuestItemOverrides? = firstInTree { it.questItems[questId] }
+
+fun QuestCategory.displayOverridesFor(questId: String): QuestDisplayOverrides? = firstInTree { it.questDisplays[questId] }
+
+fun QuestCategory.additionalLoreFor(questId: String): QuestAdditionalLore? = firstInTree { it.questAdditionalLore[questId] }
+
 fun QuestCategory.allQuests(): List<QuestEntry> = orderedQuestRefs().mapNotNull { it.get() }
 
 enum class CategoryStatus {

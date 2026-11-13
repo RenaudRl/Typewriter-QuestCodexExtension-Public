@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.18.0 — unreleased
+## 2.18.0 — 2026-11-13
 
 - **New: nested categories, with no depth limit.** Tag slots `CATEGORY_SLOT` in a category's menu and they
   list its direct sub-categories (same icon, lore and click as the main menu, `hideWhenLocked`

@@ -32,6 +32,10 @@ import btcrenaud.questcodex.ui.AugmentedSimpleLayout
 import btcrenaud.questcodex.ui.CodexButtonResolverLayout
 import btcrenaud.questcodex.ui.CodexButtonType
 import btcrenaud.questcodex.ui.CodexButtonTypes
+import btcrenaud.questcodex.ui.CodexMenuKind
+import btcrenaud.questcodex.ui.MarkerGroup
+import btcrenaud.questcodex.ui.entryAt
+import btcrenaud.questcodex.ui.pageCountOf
 import btcrenaud.questcodex.ui.DynamicSlotContent
 import btcrenaud.questcodex.advancement.AdvancementDatapackService
 import btcrenaud.questcodex.migration.CategoryMenuChassisMigration
@@ -77,6 +81,9 @@ object QuestCodexInitializer : Initializable {
     enum class SortMode { ALL, NOT_STARTED, ACTIVE, COMPLETED }
 
     private val mm = MiniMessage.miniMessage()
+
+    /** Menu definition ids of category menus are this prefix + the lowercased category name; also read back by BACK and SORT. */
+    private const val CATEGORY_MENU_ID_PREFIX = "codex:category:"
 
     /** Sort mode per player — a single shared field let one player's sort reshuffle everyone's menu. */
     private val sortModes = java.util.concurrent.ConcurrentHashMap<java.util.UUID, SortMode>()
@@ -259,10 +266,13 @@ object QuestCodexInitializer : Initializable {
             CodexNavAction.SCROLL_LEFT -> MenuSessionService.scroll(player, -1, 0)
             CodexNavAction.SCROLL_RIGHT -> MenuSessionService.scroll(player, 1, 0)
             CodexNavAction.BACK -> {
-                // BACK always returns to the main menu when one is configured;
+                // BACK from a sub-category returns to its parent category (one level up, whatever the
+                // depth). From a root category it returns to the main menu when one is configured;
                 // otherwise it falls back to the session history, then closes.
+                val parent = backTargetOf(session.definition.id)
                 val mainConfig = categoryMenuEntries[""]
                 when {
+                    parent != null -> openCategoryMenu(player, parent.name, pushHistory = false)
                     mainConfig != null && mainConfig.usesLayoutPool -> openMainMenu(player)
                     QuestCodexConfig.mainMenuTrigger.id.isNotBlank() ->
                         listOf(QuestCodexConfig.mainMenuTrigger).triggerEntriesFor(player, context())
@@ -280,8 +290,8 @@ object QuestCodexInitializer : Initializable {
                     SortMode.COMPLETED -> SortMode.ALL
                 }
                 val id = session.definition.id
-                if (id.startsWith("codex:category:")) {
-                    val categoryName = id.removePrefix("codex:category:")
+                if (id.startsWith(CATEGORY_MENU_ID_PREFIX)) {
+                    val categoryName = id.removePrefix(CATEGORY_MENU_ID_PREFIX)
                     // Save history before re-registering (pushHistory=false discards current session)
                     val savedHistory = session.history.toList()
                     openCategoryMenu(player, categoryName, pushHistory = false)
@@ -462,11 +472,12 @@ object QuestCodexInitializer : Initializable {
 
         // The mirror case: a category exists and is clickable, but nothing is configured to open.
         QuestCategoryRegistry.all()
-            .filter { categoryMenuEntries[it.name.lowercase()] == null }
+            .filter { menuEntryFor(it) == null }
             .forEach {
                 plugin.logger.warning(
-                    "[QuestCodex] category '${it.name}' is defined but has no category_menu entry; " +
-                        "opening it does nothing. Create a category_menu with category '${it.name}'."
+                    "[QuestCodex] category '${it.name}' is defined but neither it nor any parent category has a " +
+                        "category_menu entry; opening it does nothing. Create a category_menu with category " +
+                        "'${it.name}' (it also serves every sub-category that has no menu of its own)."
                 )
             }
     }
@@ -508,11 +519,18 @@ object QuestCodexInitializer : Initializable {
             problems += "the main layout '$mainLayoutId' of GUI '${gui.name}' is not in its layout pool."
         }
 
-        val markerType = markerTypeFor(entry)
-        if (gui.layoutPool.flatMap(::layoutItems).none { it.buttonType == markerType }) {
-            val what = if (markerType == CodexButtonType.CATEGORY_SLOT.name) "category" else "quest"
-            problems += "no slot in GUI '${gui.name}' is tagged '$markerType', so the menu opens " +
-                "with no $what in it. Tag at least one slot with it — one tagged slot holds one $what."
+        // A category menu is valid with quest slots, sub-category slots, or both.
+        val kind = CodexMenuKind.of(entry.category)
+        val markerNames = kind.markers.map { it.name }
+        if (gui.layoutPool.flatMap(::layoutItems).none { it.buttonType in markerNames }) {
+            val tags = markerNames.joinToString(" or ") { "'$it'" }
+            val what = when (kind) {
+                CodexMenuKind.MAIN -> "category"
+                CodexMenuKind.CATEGORY -> "quest or sub-category"
+                CodexMenuKind.TRACKED -> "quest"
+            }
+            problems += "no slot in GUI '${gui.name}' is tagged $tags, so the menu opens " +
+                "with no $what in it. Tag at least one slot with one of them — one tagged slot holds one $what."
         }
 
         // The codex builds the inventory from `rows`, not from the GUI's own size: a mismatch
@@ -526,13 +544,6 @@ object QuestCodexInitializer : Initializable {
         }
 
         return problems
-    }
-
-    /** The dynamic marker this menu's slots must carry. */
-    private fun markerTypeFor(entry: CategoryMenuEntry): String = when {
-        entry.category.isBlank() -> CodexButtonType.CATEGORY_SLOT.name
-        entry.category.equals("@tracked", ignoreCase = true) -> CodexButtonType.TRACKED_QUEST_SLOT.name
-        else -> CodexButtonType.QUEST_SLOT.name
     }
 
     /** Items a pool layout declares directly; container layouts hold theirs by reference. */
@@ -659,12 +670,18 @@ object QuestCodexInitializer : Initializable {
      * inside the layout tree and follow scrollable/paginated/frame viewports.
      * [CodexButtonResolverLayout] swaps each visible marker for its quest/category
      * content at render time.
+     *
+     * [owner] is the category being shown (null for the main menu). [menuConfig] is its own
+     * `category_menu` or an ancestor's, so the menu id and the quests always come from [owner].
+     * Quest and category markers are paged by one shared page index; a group that fits in its
+     * markers stays pinned (see [MarkerGroup]).
      */
     private fun openMenuFromLayoutPool(
         player: Player,
         menuConfig: CategoryMenuEntry,
-        entries: List<*>,
-        isMainMenu: Boolean,
+        owner: QuestCategory?,
+        categories: List<QuestCategory>,
+        quests: List<QuestEntry>,
         pushHistory: Boolean = true,
         targetViewId: String? = null,
         reopenOnView: (Player, String) -> Unit = { _, _ -> },
@@ -672,22 +689,30 @@ object QuestCodexInitializer : Initializable {
         val ctx = com.typewritermc.core.interaction.context()
         val rows = menuConfig.rows.coerceIn(1, 6)
         val size = InventorySize.entries.getOrNull(rows - 1) ?: InventorySize.SIZE_54
+        val isMainMenu = owner == null
+        val kind = CodexMenuKind.of(menuConfig.category)
 
         // 1. Index dynamic markers so they traverse parsing as ordinary tagged slots.
         // Shared with the startup validation on purpose: a second copy here is how the marker the
         // author is told to place drifts away from the one the renderer actually looks for.
-        val markerType = markerTypeFor(menuConfig)
-        val (indexedPool, markerCount) = indexDynamicMarkers(menuConfig.layoutPool.filterNotNull(), markerType)
+        var indexedPool = menuConfig.layoutPool.filterNotNull()
+        val markerCounts = kind.markers.associateWith { type ->
+            indexDynamicMarkers(indexedPool, type.name).let { (pool, count) ->
+                indexedPool = pool
+                count
+            }
+        }
+        val questGroup = MarkerGroup(quests.size, markerCounts[kind.questMarker] ?: 0)
+        val categoryGroup = MarkerGroup(categories.size, markerCounts[kind.categoryMarker] ?: 0)
 
-        val menuId =
-            if (isMainMenu) "codex:main" else "codex:category:${menuConfig.category.lowercase()}"
+        val menuId = if (owner == null) "codex:main" else "$CATEGORY_MENU_ID_PREFIX${owner.name.lowercase()}"
 
         // Claim pagination only when this menu actually has markers to page over — with none, the
         // engine's PaginatedLayout stays in charge. Everything past the first page used to be
         // unreachable here: the providers below ignored the page entirely.
-        if (markerCount > 0) {
-            val pageCount = ((entries.size + markerCount - 1) / markerCount).coerceAtLeast(1)
-            questPagination[player.uniqueId] = QuestPagination(menuId, pageCount, page = 0)
+        if (questGroup.markerCount + categoryGroup.markerCount > 0) {
+            questPagination[player.uniqueId] =
+                QuestPagination(menuId, pageCountOf(listOf(questGroup, categoryGroup)), page = 0)
         } else {
             questPagination.remove(player.uniqueId)
         }
@@ -720,36 +745,30 @@ object QuestCodexInitializer : Initializable {
         }
 
         // 3. Render-time provider mapping marker indices to quest/category content.
-        val dynamicProvider: (Int) -> DynamicSlotContent?
-        if (isMainMenu) {
-            @Suppress("UNCHECKED_CAST")
-            val categories = entries as List<QuestCategory>
-            if (markerCount == 0 && categories.isNotEmpty()) {
-                plugin.logger.warning("[QuestCodex] Main menu has ${categories.size} categories but no CATEGORY_SLOT marker.")
-            }
-            dynamicProvider = { index ->
-                val offset = pageFor(player, menuId) * markerCount
-                categories.getOrNull(offset + index)?.let { category ->
+        if (questGroup.markerCount == 0 && quests.isNotEmpty()) {
+            plugin.logger.warning("[QuestCodex] Menu '$menuId' has ${quests.size} quests but no ${kind.questMarker?.name} marker.")
+        }
+        if (categoryGroup.markerCount == 0 && categories.isNotEmpty()) {
+            plugin.logger.warning("[QuestCodex] Menu '$menuId' has ${categories.size} categories but no ${kind.categoryMarker?.name} marker.")
+        }
+        val dynamicProvider: (CodexButtonType, Int) -> DynamicSlotContent? = { type, index ->
+            val page = pageFor(player, menuId)
+            when (type) {
+                CodexButtonType.CATEGORY_SLOT -> categories.entryAt(categoryGroup, page, index)?.let { category ->
                     DynamicSlotContent(
                         item = buildCategoryIcon(player, category),
                         commands = listOf("codex:open ${category.name}"),
                     )
                 }
-            }
-        } else {
-            @Suppress("UNCHECKED_CAST")
-            val questEntries = entries as List<QuestEntry>
-            val category = QuestCategoryRegistry.find(menuConfig.category)
-            if (markerCount == 0 && questEntries.isNotEmpty()) {
-                plugin.logger.warning("[QuestCodex] Category '${menuConfig.category}' has ${questEntries.size} quests but no QUEST_SLOT marker.")
-            }
-            dynamicProvider = { index ->
-                val quest = questEntries.getOrNull(pageFor(player, menuId) * markerCount + index)
-                if (quest == null || category == null) null
-                else DynamicSlotContent(
-                    item = buildQuestIcon(player, quest, category),
-                    commands = listOf("codex:quest ${quest.id}"),
-                )
+                CodexButtonType.QUEST_SLOT, CodexButtonType.TRACKED_QUEST_SLOT ->
+                    if (owner == null) null
+                    else quests.entryAt(questGroup, page, index)?.let { quest ->
+                        DynamicSlotContent(
+                            item = buildQuestIcon(player, quest, owner),
+                            commands = listOf("codex:quest ${quest.id}"),
+                        )
+                    }
+                else -> null // the resolver only forwards the three dynamic marker types
             }
         }
 
@@ -800,7 +819,8 @@ object QuestCodexInitializer : Initializable {
         val fallbackTitle = if (isMainMenu) {
             menuConfig.title.ifBlank { QuestCodexConfig.mainMenuTitle }
         } else {
-            menuConfig.title.ifBlank { QuestCategoryRegistry.find(menuConfig.category)?.title ?: menuConfig.category }
+            // A title set on a menu shared with sub-categories is shared too; blank shows each category's own.
+            menuConfig.title.ifBlank { owner?.title ?: menuConfig.category }
         }
 
         val resolvedView = if (inherited.views.isEmpty()) null else
@@ -943,8 +963,9 @@ object QuestCodexInitializer : Initializable {
             openMenuFromLayoutPool(
                 target,
                 menuConfig,
-                categories,
-                isMainMenu = true,
+                owner = null,
+                categories = categories,
+                quests = emptyList(),
                 pushHistory = push,
                 targetViewId = viewId,
                 reopenOnView = { next, nextViewId ->
@@ -956,10 +977,33 @@ object QuestCodexInitializer : Initializable {
     }
 
     /**
-     * Opens a category menu (list of quests in a category) for a player.
+     * The `category_menu` that draws [category]: its own, else the one of its nearest ancestor, so a
+     * deep tree needs one menu per distinct look, not one per level. Null when no level has one.
+     */
+    private fun menuEntryFor(category: QuestCategory): CategoryMenuEntry? =
+        category.nearestInLineage { categoryMenuEntries.containsKey(it.name.lowercase()) }
+            ?.let { categoryMenuEntries[it.name.lowercase()] }
+
+    /** Parent category a BACK click leaves [menuId] for; null when the menu is not a sub-category's or the parent cannot open. */
+    private fun backTargetOf(menuId: String): QuestCategory? {
+        if (!menuId.startsWith(CATEGORY_MENU_ID_PREFIX)) return null
+        val parent = QuestCategoryRegistry.find(menuId.removePrefix(CATEGORY_MENU_ID_PREFIX))?.parent
+        return parent?.takeIf { menuEntryFor(it) != null }
+    }
+
+    /** Number of indexed slots [menuConfig]'s own layout pool tags with [type]; 0 when the kind has no such marker. */
+    private fun markerCount(menuConfig: CategoryMenuEntry, type: CodexButtonType?): Int =
+        if (type == null) 0 else indexDynamicMarkers(menuConfig.layoutPool.filterNotNull(), type.name).second
+
+    /**
+     * Opens a category menu for a player: the category's quests and, when the layout asks for
+     * them, its direct sub-categories.
      *
-     * Uses the [CategoryMenuEntry] layout pool for full customization.
-     * Quests are injected as dynamic slots at positions tagged "codex_button:QUEST_SLOT".
+     * Uses the [CategoryMenuEntry] layout pool for full customization — the category's own
+     * `category_menu`, or the nearest ancestor's when it has none (see [menuEntryFor]).
+     * Quests are injected at slots tagged "codex_button:QUEST_SLOT", sub-categories at slots tagged
+     * "codex_button:CATEGORY_SLOT". A menu with at least one CATEGORY_SLOT lists only the quests the
+     * category declares itself; a menu without any keeps listing the whole tree's quests as before.
      */
     fun openCategoryMenu(
         player: Player,
@@ -973,8 +1017,26 @@ object QuestCodexInitializer : Initializable {
             return
         }
 
-        val menuConfig = categoryMenuEntries[categoryName.lowercase()]
-        val allQuests = category.getVisibleQuests(player)
+        val menuConfig = menuEntryFor(category)
+        if (menuConfig == null || !menuConfig.usesLayoutPool) {
+            val cause = menuConfig?.let { chassisFailure(it) }
+                ?: "no category_menu entry exists for it or for any parent category. " +
+                    "Create one with category '$categoryName'."
+            plugin.logger.warning("[QuestCodex] Category '$categoryName' could not open: $cause")
+            return
+        }
+
+        val listsSubCategories =
+            markerCount(menuConfig, CodexMenuKind.of(menuConfig.category).categoryMarker) > 0
+        val subCategories = if (listsSubCategories) {
+            category.orderedSubCategories().filter { it.isVisible(player) }
+        } else {
+            emptyList()
+        }
+        val allQuests = category.getVisibleQuests(
+            player,
+            if (listsSubCategories) QuestScope.OWN else QuestScope.TREE,
+        )
         // Filter by current sort mode
         val quests = when (sortModeOf(player)) {
             SortMode.ALL -> allQuests
@@ -983,19 +1045,13 @@ object QuestCodexInitializer : Initializable {
             SortMode.COMPLETED -> allQuests.filter { it.questStatus(player) == QuestStatus.COMPLETED }
         }
 
-        if (menuConfig == null || !menuConfig.usesLayoutPool) {
-            val cause = menuConfig?.let { chassisFailure(it) }
-                ?: "no category_menu entry exists for it. Create one with category '$categoryName'."
-            plugin.logger.warning("[QuestCodex] Category '$categoryName' could not open: $cause")
-            return
-        }
-
         fun openOn(target: Player, viewId: String?, push: Boolean) {
             openMenuFromLayoutPool(
                 target,
                 menuConfig,
-                quests,
-                isMainMenu = false,
+                owner = category,
+                categories = subCategories,
+                quests = quests,
                 pushHistory = push,
                 targetViewId = viewId,
                 reopenOnView = { next, nextViewId ->
@@ -1027,8 +1083,9 @@ object QuestCodexInitializer : Initializable {
             openMenuFromLayoutPool(
                 target,
                 menuConfig,
-                quests,
-                isMainMenu = false,
+                owner = syntheticCategory,
+                categories = emptyList(),
+                quests = quests,
                 pushHistory = push,
                 targetViewId = viewId,
                 reopenOnView = { next, nextViewId ->
@@ -1137,8 +1194,8 @@ object QuestCodexInitializer : Initializable {
         return true
     }
 
-    private fun QuestCategory.getVisibleQuests(player: Player): List<QuestEntry> {
-        return allQuests()
+    private fun QuestCategory.getVisibleQuests(player: Player, scope: QuestScope): List<QuestEntry> {
+        return questRefs(scope).mapNotNull { it.get() }
             .filter { quest ->
                 val status = quest.questStatus(player)
                 val display = questDisplays[quest.id]
@@ -1148,7 +1205,7 @@ object QuestCodexInitializer : Initializable {
                     QuestStatus.COMPLETED -> !(display?.completed?.hideQuest ?: false)
                 }
             }
-        // No sort here on purpose: allQuests() is already in the configured order, and filtering
+        // No sort here on purpose: questRefs() is already in the configured order, and filtering
         // preserves it. Re-sorting on `name` made the order depend on display text, and the
         // per-status filtering above meant a quest changing state could reshuffle the whole menu.
     }

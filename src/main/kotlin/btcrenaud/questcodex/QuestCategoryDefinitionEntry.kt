@@ -46,7 +46,7 @@ class QuestCategoryDefinitionEntry(
     @Help("Item used as the category icon in menus.")
     @ContentEditor(HoldingItemContentMode::class)
     val icon: Item = CustomItem(),
-    @Help("Parent category name. Leave empty for a top-level category.")
+    @Help("Parent category name. Leave empty for a top-level category. A sub-category is listed by CATEGORY_SLOT slots in its parent's menu, with no depth limit.")
     val parent: String = "",
     @Help("Display order (lower = first). Categories with the same order are sorted alphabetically.")
     val order: Int = 0,

@@ -57,7 +57,7 @@ class CategoryMenuEntry(
     override val criteria: List<Criteria> = emptyList(),
     override val modifiers: List<Modifier> = emptyList(),
     override val triggers: List<Ref<TriggerableEntry>> = emptyList(),
-    @Help("Category this menu configuration applies to. Leave empty for main menu.")
+    @Help("Category this menu configuration applies to. Leave empty for main menu. Also draws every sub-category that has no menu of its own.")
     val category: String = "",
     @Help("Menu title shown to the player. Supports MiniMessage and PlaceholderAPI.")
     @Placeholder

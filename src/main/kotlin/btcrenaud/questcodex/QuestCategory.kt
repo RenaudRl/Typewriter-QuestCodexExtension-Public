@@ -250,13 +250,49 @@ private fun QuestCategory.rankOf(questId: String, position: Int): Pair<Int, Int>
  * (visibility, sort mode, tracking) can remove entries but can never reshuffle the survivors.
  */
 fun QuestCategory.orderedQuestRefs(): List<Ref<QuestEntry>> {
-    val own = quests
-        .filter { it.id.isNotBlank() }
-        .mapIndexed { position, ref -> ref to rankOf(ref.id, position) }
-        .sortedWith(compareBy({ it.second.first }, { it.second.second }, { it.first.id }))
-        .map { it.first }
-    val nested = subCategories.sortedWith(CATEGORY_ORDER).flatMap { it.orderedQuestRefs() }
-    return (own + nested).distinctBy { it.id }
+    val nested = orderedSubCategories().flatMap { it.orderedQuestRefs() }
+    return (ownOrderedQuestRefs() + nested).distinctBy { it.id }
+}
+
+/** Quest refs declared directly in this category (sub-categories excluded), in display order. */
+fun QuestCategory.ownOrderedQuestRefs(): List<Ref<QuestEntry>> = quests
+    .filter { it.id.isNotBlank() }
+    .mapIndexed { position, ref -> ref to rankOf(ref.id, position) }
+    .sortedWith(compareBy({ it.second.first }, { it.second.second }, { it.first.id }))
+    .map { it.first }
+
+/** Direct sub-categories in the same stable order the main menu uses for root categories. */
+fun QuestCategory.orderedSubCategories(): List<QuestCategory> = subCategories.sortedWith(CATEGORY_ORDER)
+
+/**
+ * First category of the lineage — this one, then its parent, then its grandparent… — that
+ * satisfies [predicate]; null when none does.
+ *
+ * Used to give a category without its own menu the menu of its nearest ancestor. A parent cycle
+ * (a misconfigured `parent`) ends the walk instead of looping.
+ */
+fun QuestCategory.nearestInLineage(predicate: (QuestCategory) -> Boolean): QuestCategory? {
+    val seen = mutableSetOf<String>()
+    var current: QuestCategory? = this
+    while (current != null && seen.add(current.name.lowercase())) {
+        if (predicate(current)) return current
+        current = current.parent
+    }
+    return null
+}
+
+/** Which quests a category menu lists. */
+enum class QuestScope {
+    /** Only the quests declared in the category: its sub-categories are reachable through their own buttons. */
+    OWN,
+
+    /** The quests of the whole category tree, flattened into one list (menus without sub-category buttons). */
+    TREE,
+}
+
+fun QuestCategory.questRefs(scope: QuestScope): List<Ref<QuestEntry>> = when (scope) {
+    QuestScope.OWN -> ownOrderedQuestRefs()
+    QuestScope.TREE -> orderedQuestRefs()
 }
 
 fun QuestCategory.allQuests(): List<QuestEntry> = orderedQuestRefs().mapNotNull { it.get() }

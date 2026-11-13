@@ -46,6 +46,13 @@ BlueMap is only needed for the `bluemap_icon` entry.
 | Tracking artifact | `quest_codex_tracking_artifact` |
 | Recovery artifact | `quest_codex_recovery_artifact` |
 
+**Nested categories.** Set `parent` on a `quest_category` to nest it, to any depth. In a category's
+`category_menu`, tag slots `CATEGORY_SLOT` to list its direct sub-categories and `QUEST_SLOT` to list its
+own quests: both can share one menu, and the same PAGE_NEXT / PAGE_PREV pages them (a group that fits its
+slots stays on every page). Without any `CATEGORY_SLOT` the menu behaves as before and also lists the
+quests of its sub-categories. A category with no `category_menu` of its own opens with the nearest
+ancestor's, and BACK from a sub-category returns to its parent.
+
 ### Commands & permissions
 
 | Command | Permission | Description |

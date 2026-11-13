@@ -2,6 +2,15 @@
 
 ## 2.18.0 — unreleased
 
+- **New: nested categories, with no depth limit.** Tag slots `CATEGORY_SLOT` in a category's menu and they
+  list its direct sub-categories (same icon, lore and click as the main menu, `hideWhenLocked`
+  respected) next to its `QUEST_SLOT` quests. Once a menu has a `CATEGORY_SLOT`, `QUEST_SLOT` lists only
+  the quests the category declares itself; a menu without one is unchanged and still flattens the
+  sub-categories' quests. Both marker types share one PAGE_NEXT / PAGE_PREV: a group that fits its slots
+  stays on every page, only an overflowing group pages. A category without its own `category_menu`
+  now opens with its nearest ancestor's, so a deep tree does not need one menu per level (a title set on
+  that shared menu is shared too; leave it empty to show each category's own title). BACK from a
+  sub-category returns to its parent. `CATEGORY_SLOT` in a category menu is no longer reported at startup.
 - **New: default lore for quest buttons.** Turn on `questLoreDefaults.enabled` in `quest_codex` and every
   quest button shows a lore without any per-quest setup: a message for not started and completed quests,
   and the objectives the player currently sees for quests in progress (all of them when several run in

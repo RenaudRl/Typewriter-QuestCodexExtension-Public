@@ -26,8 +26,9 @@ data class DynamicSlotContent(
  * Indexed markers (`QUEST_SLOT#<n>` / `CATEGORY_SLOT#<n>`) are produced by the
  * initializer before layout parsing, so they live inside the layout tree and follow
  * scrollable/paginated/frame viewports like any other slot. This resolver swaps each
- * visible marker for the n-th quest/category content at the marker's final on-screen
- * position. Markers whose index has no content render as empty slots.
+ * visible marker for the n-th quest/category content (of the marker's own type, so quest
+ * and category markers coexist in one menu) at the marker's final on-screen position.
+ * Markers whose index has no content render as empty slots.
  *
  * Navigation tags (BACK, CLOSE, SCROLL_*, ...) resolve to nav buttons at the tagged
  * slot's position. The author-configured icon, name and lore on that slot are kept
@@ -37,7 +38,7 @@ data class DynamicSlotContent(
 class CodexButtonResolverLayout(
     inner: MenuLayout,
     private val player: Player,
-    private val dynamicProvider: ((Int) -> DynamicSlotContent?)? = null,
+    private val dynamicProvider: ((CodexButtonType, Int) -> DynamicSlotContent?)? = null,
     override val id: String? = null,
 ) : MenuLayout {
 
@@ -69,18 +70,18 @@ class CodexButtonResolverLayout(
         // Indexed dynamic markers: "QUEST_SLOT#<n>" / "CATEGORY_SLOT#<n>".
         val hashIndex = type.indexOf('#')
         if (hashIndex >= 0) {
-            val base = type.take(hashIndex)
-            if (base != CodexButtonType.QUEST_SLOT.name &&
-                base != CodexButtonType.TRACKED_QUEST_SLOT.name &&
-                base != CodexButtonType.CATEGORY_SLOT.name
+            val base = CodexButtonType.entries.firstOrNull { it.name == type.take(hashIndex) }
+            if (base != CodexButtonType.QUEST_SLOT &&
+                base != CodexButtonType.TRACKED_QUEST_SLOT &&
+                base != CodexButtonType.CATEGORY_SLOT
             ) return null
             val index = type.substring(hashIndex + 1).toIntOrNull() ?: return null
-            val content = dynamicProvider?.invoke(index)
+            val content = dynamicProvider?.invoke(base, index)
             if (content == null) {
                 // A tracked marker doubles as its fully author-configurable EMPTY state.
                 // It remains inert, so lore such as "Click to stop tracking" is never
                 // attached by the extension when no quest occupies this position.
-                if (base == CodexButtonType.TRACKED_QUEST_SLOT.name) {
+                if (base == CodexButtonType.TRACKED_QUEST_SLOT) {
                     return original.copy(
                         allowPickup = false,
                         isGhost = false,
